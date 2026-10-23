@@ -1,0 +1,76 @@
+{
+  "session_id": "f7b8d240-8692-4ed1-bee6-160cc905d12d",
+  "session_name": "LangChain 接入测试 · Live",
+  "created_at": "2026-10-18T16:16:05.882244+00:00",
+  "provider_host": "api.deepseek.com",
+  "configured_model": "deepseek-flash",
+  "mode": "live",
+  "final_seq": 19,
+  "model_request_count": 4,
+  "tool_calls": [
+    {
+      "call_id": "call_00_kPD60abBoTPSEFuIRiKF5335",
+      "name": "multiply",
+      "arguments": {
+        "a": 6,
+        "b": 7
+      },
+      "output": "42",
+      "status": "completed",
+      "seq": 7,
+      "result_seq": 8
+    },
+    {
+      "call_id": "call_00_ET_sI8JKoThFgJ3iHhoHmH06388",
+      "name": "context.state.set",
+      "arguments": {
+        "key": "last_result",
+        "value": 42,
+        "value_type": "number",
+        "description": "6 乘 7 的计算结果"
+      },
+      "output": "{\"updated\": \"last_result\", \"value\": 42}",
+      "status": "completed",
+      "seq": 11,
+      "result_seq": 13
+    }
+  ],
+  "fields": {
+    "last_result": {
+      "value": 42,
+      "value_type": "number",
+      "description": "6 乘 7 的计算结果",
+      "seq": 12
+    }
+  },
+  "final_answer": "42",
+  "builds": [
+    {
+      "id": "39ab3e6e-d4cb-4450-b442-969c556a6aeb",
+      "seq": 4,
+      "sha256": "6272016d9fa131a76866d491bce59700acfeec5d4408b7565581fc1431e8a1ab"
+    },
+    {
+      "id": "493fbb85-cf53-455c-91ab-41423edcc3e2",
+      "seq": 8,
+      "sha256": "4026e5b4be8405f191f4b2f7d8ff363a13d9ca22abc868323227f63dda24895f"
+    },
+    {
+      "id": "24857343-6cf6-4cc0-bdff-9093588c6709",
+      "seq": 13,
+      "sha256": "585786183f2a58e1c1fa93462115974c21e9b2b04cfa59fb2e446b5bdaa1bc3a"
+    },
+    {
+      "id": "e85bfe97-9a21-43d0-a882-c908668745a1",
+      "seq": 17,
+      "sha256": "d7e6d04678d7d51581fe00180bdc6c539e87056b4f0d4744537fd7ce9645411b"
+    }
+  ],
+  "checks": {
+    "tool_execution": true,
+    "state_persisted": true,
+    "fresh_agent_recall": true,
+    "no_tool_reexecution_on_recall": true,
+    "request_archives_saved": true
+  }
+}

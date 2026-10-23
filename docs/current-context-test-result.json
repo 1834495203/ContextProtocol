@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-21",
+  "scope": "current-context/0.3",
+  "backends": ["postgresql", "sqlite"],
+  "suite_passed": 51,
+  "live_provider_called": false,
+  "langchain_mock": {
+    "session_id": "7d91f8bd-09a8-46a5-adf7-95ea96534f38",
+    "multiply": 42,
+    "last_result": 42,
+    "fresh_agent_recalled": true
+  },
+  "browser": {
+    "single_ordered_context": true,
+    "recent_whole_turn_filter_verified": true,
+    "history_navigation_removed": true
+  }
+}

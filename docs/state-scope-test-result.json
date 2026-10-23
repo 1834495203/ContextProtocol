@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-23",
+  "tests_passed": 97,
+  "backends": ["sqlite", "postgresql"],
+  "coverage": [
+    "template prompt and state definition propagation to existing instances",
+    "instance-only configuration isolation",
+    "runtime values and observations retained",
+    "definition default changes leave model_input unchanged",
+    "shared component ordering with local components retained",
+    "stale instance revisions rejected after template synchronization",
+    "incompatible field types roll back template and every instance",
+    "external content collisions and deletion protection"
+  ],
+  "browser_checks": ["prominent state management", "state scope editor", "prompt scope editor", "collapsible model input"],
+  "external_model_calls": 0
+}

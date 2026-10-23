@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><title>Context Protocol · 上下文工作台</title>
+  <link rel="stylesheet" href="/static/style.css?v=0.7.1"><script defer src="/static/app.js?v=0.7.1"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-icon">⌘</span><span>Context<span class="brand-sub">PROTOCOL / 0.7</span></span></a>
+    <div class="workspace-label">WORKSPACE <span>本地工作空间</span></div>
+    <nav><button class="nav-item active" data-view="templates"><span>▤</span>模板库</button><button class="nav-item" data-view="workspace"><span>▦</span>上下文编排</button><button class="nav-item" data-view="protocol"><span>⌁</span>协议与接入</button></nav>
+    <div class="session-heading">模板 <button id="new-template-side" title="新建模板" aria-label="新建模板">＋</button></div>
+    <div id="template-nav" class="sessions"></div>
+    <div class="sidebar-bottom"><span id="db-dot" class="status-dot"></span><span id="db-status">连接存储…</span><small>当前上下文 · 本地持久化</small></div>
+  </aside>
+  <main>
+    <header><div class="breadcrumb">工作空间 <span>/</span> <strong id="breadcrumb">上下文编排</strong></div><div class="local-badge"><span class="status-dot"></span> LOCAL <span class="avatar">C</span></div></header>
+    <div id="offline" class="offline hidden"></div>
+    <div class="page-top"><div><div class="eyebrow">CONTEXT WORKSPACE</div><h1 id="page-title">上下文编排</h1><p id="page-description">一份有序上下文，规划模型将看到的全部内容。</p></div><div class="top-actions"><button class="button hidden" id="instance-info">实例信息</button><button class="button hidden" id="assign-instance">设置归属模板</button><button class="button hidden" id="agent-connect">Agent 接入</button><button class="button hidden" id="rename-template">模板信息</button><button class="button hidden" id="save-template">另存为模板</button><button class="button primary hidden" id="use-template">使用此模板</button><button class="button" id="export">↗ 导出上下文</button><button class="button primary" id="build">刷新编译 ↗</button></div></div>
+    <section id="view-templates">
+      <div class="section-heading"><div><h2>上下文模板库 <span class="tag">TEMPLATES</span></h2><p>选择并编辑可复用的组成、默认提示词、字段默认值与压缩策略。</p></div><button class="button primary" id="new-template">＋ 新建模板</button></div>
+      <div class="template-explanation">模板 → 为 Agent 创建独立运行实例 → 同步工具与对话。不同实例的数据各自保存。</div>
+      <div id="template-list" class="template-grid"></div><details id="unassigned-panel" class="legacy-instances hidden"><summary id="unassigned-title">待归属旧实例</summary><p>为旧实例指定模板和简名，只整理归属，保留原有上下文数据。</p><div id="unassigned-list"></div></details>
+    </section>
+    <section id="empty" class="empty hidden"><h2>选择一个模板开始</h2><p>可创建自己的模板，或使用模板库中的基础模板。</p><button id="demo" class="button primary">打开模板库</button></section>
+    <div id="session-content" class="hidden"><section id="template-instances-panel" class="hidden"></section>
+      <section class="stats"><div><span id="object-label">当前上下文</span><strong id="stat-session">—</strong><small id="stat-revision">保存后立即生效</small></div><div><span>上下文组件</span><strong id="stat-groups">0</strong><small>顺序、来源、策略均可配置</small></div><div><span>编译字符数</span><strong id="stat-chars">0</strong><small id="stat-budget">预算 24,000 字符</small></div><div><span>模型输入</span><strong id="stat-messages">0</strong><small id="stat-tools">0 个工具定义</small></div></section>
+      <section id="view-workspace"><div id="object-note" class="template-explanation"></div>
+        <section id="state-panel" class="state-panel" aria-label="状态定义与当前状态"></section>
+        <div class="section-heading"><div><h2><span id="composition-title">给 AI 的上下文</span> <span class="tag">MODEL INPUT</span></h2><p>按模型输入顺序展示。对话与工具结果也是其中的组件，可自由排序、启用与压缩。</p></div><button class="text-button" id="add-group">＋ 新建组件</button></div>
+        <div class="context-toolbar"><label>字符预算 <input type="number" id="budget" value="24000" min="100" max="2000000"></label><div><button class="text-button" id="add-prompt">＋ 提示词</button><button class="text-button" id="add-message">＋ 用户发言</button><button class="text-button" id="copy-prompt">复制模型输入</button></div></div>
+        <div id="warnings"></div><div id="groups" class="unified-context"></div>
+        <details class="preview-panel raw-input"><summary class="preview-heading"><h2>完整模型输入 · JSON</h2><span class="tag">与上方同源</span></summary><p class="conversation-help">通用消息与工具定义。适配器将角色、工具名映射到宿主框架；工具是否可执行由宿主决定。</p><pre id="prompt"></pre></details>
+      </section>
+      <section id="view-protocol" class="hidden"><div class="protocol-card"><span class="tag green">CONTEXT PROTOCOL / 0.7</span><h2>管理模型输入，连接任意 Agent。</h2><p>适配器同步对话和工具记录，工作台保存当前上下文。每次模型调用前，读取同一套有序组件和压缩策略编译输入。修改内容仅改变模型将收到的上下文。</p><div class="pipeline"><span>宿主同步内容</span> → <span>当前上下文</span> → <span>分组编译</span> → <span>模型输入</span></div><h3>1. 同步外部工具、对话与调用结果</h3><pre id="protocol-example"></pre><h3>2. 编译当前上下文</h3><pre id="build-example"></pre><p>model_input 是前端和 LangChain 适配器共享的消息与工具表示。组件类型、绑定、顺序和策略均可扩展；外部定义由提供方同步。</p><h3>3. 内置状态更新工具</h3><p>context.state.set 可创建和更新自定义字段。宿主将它映射到 state.set 更新；业务工具的执行仍由宿主负责。</p><pre id="state-example"></pre><a href="/docs" target="_blank" rel="noopener">查看 API 文档 ↗</a></div></section>
+    </div>
+    <footer>CONTEXT PROTOCOL <span>编排、查看和修改当前上下文。</span><span class="footer-right">TEMPLATES & CONTEXTS / 0.7</span></footer>
+  </main>
+  <dialog id="editor"><form id="editor-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="close-dialog" aria-label="关闭">×</button></div><div id="editor-fields"></div><p id="form-error" class="form-error"></p><div class="dialog-actions"><button type="button" class="button" id="cancel-dialog">取消</button><button type="submit" class="button primary" id="save-dialog">保存</button></div></form></dialog>
+  <div id="toast" role="status" class="toast hidden"></div>
+</body>
+</html>

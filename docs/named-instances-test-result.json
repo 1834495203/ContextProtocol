@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-21",
+  "scope": "named-template-instances/0.5",
+  "suite_passed": 75,
+  "backends": [
+    "sqlite",
+    "postgresql"
+  ],
+  "live_provider_called": false,
+  "verified": [
+    "instances listed within their template",
+    "template-scoped unique slug",
+    "concurrent connect creates once",
+    "create=false never creates",
+    "metadata editing preserves context",
+    "legacy assignment preserves context",
+    "stable names backfilled once",
+    "browser rename/create/connection-code"
+  ],
+  "cli_reconnect": {
+    "template_id": "03e2017e-53db-4668-a832-626de5acf002",
+    "slug": "researcher",
+    "instance_id": "d8e02c40-e900-41cf-9dea-ec17e94c3e27",
+    "first_revision": 22,
+    "second_revision": 43,
+    "same_instance": true
+  },
+  "browser_template_id": "8ea659b8-1ede-4eb7-a119-d0aa9dbf6c55",
+  "browser_slugs": [
+    "main",
+    "review"
+  ]
+}

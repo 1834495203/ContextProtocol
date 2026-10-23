@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-21",
+  "scope": "context-templates/0.4",
+  "suite_passed": 63,
+  "backends": [
+    "sqlite",
+    "postgresql"
+  ],
+  "live_provider_called": false,
+  "verified": [
+    "multiple templates",
+    "template editing and copying",
+    "per-Agent independent instances",
+    "runtime values and observations excluded from saved templates",
+    "future instances use current template configuration",
+    "two LangChain mock Agents using one template",
+    "browser creation, prompt editing and template selection"
+  ],
+  "browser_template_id": "8ea659b8-1ede-4eb7-a119-d0aa9dbf6c55",
+  "browser_instance_id": "41406773-7b47-4a03-88dc-0300d67baba9"
+}

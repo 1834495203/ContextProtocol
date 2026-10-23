@@ -1,0 +1,2 @@
+-r requirements.txt
+pymysql[rsa]==1.2.3

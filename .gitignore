@@ -1,0 +1,23 @@
+.env
+.env.*
+!.env.example
+.runtime/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.idea/
+*.log
+data/
+.test-runs/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.dump
+*.pem
+*.key
+# Legacy local infrastructure for another project; use compose.context.yml.
+/docker-compose.yml

@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-21",
+  "scope": "typed-layered-backend/0.6",
+  "suite_passed": 85,
+  "backends": [
+    "sqlite",
+    "postgresql"
+  ],
+  "live_provider_called": false,
+  "verified": [
+    "concrete Pydantic command payloads",
+    "typed SQL mapper and service DTOs",
+    "controller/service/mapper boundaries",
+    "retrieval provider and compression strategy registration",
+    "OpenAPI concrete request and response models",
+    "pre-refactor idempotency digest compatibility",
+    "all 12 existing instances readable and compilable"
+  ],
+  "existing_langchain_mock": {
+    "instance_id": "d8e02c40-e900-41cf-9dea-ec17e94c3e27",
+    "last_result": 42,
+    "fresh_agent_recalled": true,
+    "revision": 64
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "source": {
+    "host": "localhost",
+    "database": "novel",
+    "schema": "context_protocol"
+  },
+  "target": {
+    "backend": "postgresql",
+    "host": "localhost",
+    "database": "context_protocol"
+  },
+  "tables": {
+    "sessions": {
+      "count": 5,
+      "sha256": "0fc0a67c57eb9eafcdd80fe95c8f1ecaee19f0c26b372d644a6915222f643af3"
+    },
+    "events": {
+      "count": 78,
+      "sha256": "53a8e9180b722156d8bd9214a6304efa6e71e11b56d536ec9944336e5de47792"
+    },
+    "snapshots": {
+      "count": 6,
+      "sha256": "633453ebd066114c099f6ea8fd6e068f719c578a5b1bd6fcb5b067defb031f64"
+    },
+    "builds": {
+      "count": 15,
+      "sha256": "4a375d2b6b1fd49f6b498e717cfe926ed23ed19f72d13f7346ea46067cf2bdfe"
+    }
+  },
+  "source_preserved": true,
+  "verified": true
+}
