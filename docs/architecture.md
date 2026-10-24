@@ -1,5 +1,7 @@
 # 后端架构
 
+工具接入使用 `HostTools`（本地注册）与 `adapters/mcp.py`（官方 MCP SDK，无 LangChain 依赖）。宿主租约、提供方目录及工具描述配置在 ContextState 的独立字段内持久化，使用同一事务和幂等命令机制；不需要重建已有数据库表。`domain/tools.py` 负责按 binding_id 解析目录、校验契约指纹并合并描述覆盖，`CompilationService.prepare` 返回当前绑定专属的输入。详见 [工具接入](tool-integration.md)。
+
 业务对象、更新载荷、数据库行、编译结果、HTTP 请求与响应都由 Pydantic 类定义。数据在各层之间传递模型实例，通过属性访问；服务层不接收 SQL 行字典，不拼接业务返回字典。
 
 ```text

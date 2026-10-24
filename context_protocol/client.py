@@ -7,6 +7,7 @@ from .models.context import Model, JsonObject
 from .models.requests import SessionInput, ConnectInput, BuildInput
 from .models.persistence import TemplateInfo, InstanceInfo, ConnectionResult, InstanceView, UpdateResult, UpdateReceipt
 from .models.compilation import CompiledContext
+from .models.host import PrepareInput, PreparedContext
 
 class WireUpdate(Model):
     protocol_version: str = "0.1"
@@ -73,6 +74,11 @@ class ContextClient:
         response = self.client.post(self.path+"/compile", json=BuildInput(budget_chars=budget_chars).model_dump())
         response.raise_for_status()
         return CompiledContext.model_validate(response.json())
+
+    def prepare(self, request: PrepareInput | None = None) -> PreparedContext:
+        response = self.client.post(self.path+"/prepare", json=(request or PrepareInput()).model_dump(mode="json"))
+        response.raise_for_status()
+        return PreparedContext.model_validate(response.json())
 
     # Compatibility for external integrations that exchange the documented JSON wire format.
     def emit(self, kind, payload, turn_id=None, update_id=None):

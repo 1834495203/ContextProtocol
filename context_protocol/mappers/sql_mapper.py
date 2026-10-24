@@ -46,10 +46,12 @@ class SqlMapper:
 
     def save_context(self, row: ContextRow) -> None:
         t = self.tables["contexts"]
+        values = row.model_dump(mode="python", exclude={"state"})
+        values["state"] = row.state.model_dump(mode="json")
         if self.context(row.session_id) is None:
-            self.connection.execute(t.insert().values(**row.model_dump(mode="python")))
+            self.connection.execute(t.insert().values(**values))
         else:
-            self.connection.execute(t.update().where(t.c.session_id == row.session_id).values(**row.model_dump(mode="python")))
+            self.connection.execute(t.update().where(t.c.session_id == row.session_id).values(**values))
 
     def receipt(self, sid: str, update_id: str) -> ReceiptRow | None:
         t = self.tables["context_receipts"]
@@ -69,11 +71,15 @@ class SqlMapper:
         return self._one(query.with_for_update() if lock and self.row_locks else query, TemplateRow)
 
     def insert_template(self, row: TemplateRow) -> None:
-        self.connection.execute(self.tables["context_templates"].insert().values(**row.model_dump(mode="python")))
+        values = row.model_dump(mode="python", exclude={"state"})
+        values["state"] = row.state.model_dump(mode="json")
+        self.connection.execute(self.tables["context_templates"].insert().values(**values))
 
     def save_template(self, row: TemplateRow) -> None:
         t = self.tables["context_templates"]
-        self.connection.execute(t.update().where(t.c.id == row.id).values(**row.model_dump(mode="python")))
+        values = row.model_dump(mode="python", exclude={"state"})
+        values["state"] = row.state.model_dump(mode="json")
+        self.connection.execute(t.update().where(t.c.id == row.id).values(**values))
 
     def binding(self, sid: str) -> BindingRow | None:
         t = self.tables["context_bindings"]

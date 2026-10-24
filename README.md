@@ -1,5 +1,13 @@
 # Context Protocol
 
+状态和记忆工具现为[可选上下文工具提供方](docs/context-tools.md)：宿主显式选择并注册，支持本地调用、LangChain 普通提供方和独立 MCP Server。新实例不再自动注入工具，`GET /api/context-tools` 仅发现定义。
+
+让开发 AI 创建 Agent：读取 `GET /api/agent-guide`（JSON）或 `GET /api/agent-guide?format=markdown`。接口集中提供当前服务地址、OpenAPI/协议入口、接入规则、请求示例、数据 Schema 和完整 MCP/JS 示例源码；只读且无需数据库即可获取。
+
+工具推荐通过 MCP 接入，也支持本地 Python/JS/HTTP 注册。现已提供独立于 LangChain 的 MCP SDK 接入、按宿主连接隔离的工具目录、可编辑的工具描述和参数解释，以及工作台绑定预览。见 [MCP 优先工具接入](docs/tool-integration.md)。
+
+框架无关宿主接入见 [宿主协议 text-tools / 0.1](docs/host-protocol.md)：提供版本发现、能力声明和统一的 `/prepare` 检查，以及不依赖 LangChain 的 [Python 工具循环](examples/plain_agent.py) 与 [JavaScript 宿主](examples/plain_host.mjs)。LangChain 是可选适配器，不是协议入口。
+
 一个独立于 Agent、MCP 和模型提供商的上下文管理协议与本地可视化工作台。
 
 后端按 **controller → service → mapper** 分层；业务模型、更新命令、数据库行与响应采用 Pydantic。入口与扩展方式见 [后端架构](docs/architecture.md)。
@@ -8,7 +16,7 @@
 
 模板可新建、编辑、复制、修改名称与用途、配置默认字段值、导出；已有实例的内部配置可另存为模板。初始模板包括通用助手与研究助手。模板级配置更新会原子同步到已有实例；字段定义与默认值同步，已有运行值保留。实例级编辑只影响当前实例。详见 [模板与多 Agent 使用](docs/templates.md)。
 
-本项目管理的是**当前准备交给 AI 的一份有序上下文**。系统提示词、工具描述与 Schema、用户设置、状态、用户发言、Agent Loop、工具结果及最终输出都在运行上下文中，按组件顺序展示。模板只保存可复用的结构、默认内容与字段默认值。组件可以新增、排序、启停、重新绑定来源，并分别配置压缩策略。内部内容可编辑，外部工具和 Skill 定义由提供方同步。
+本项目管理的是**当前准备交给 AI 的一份有序上下文**。系统提示词、工具描述与 Schema、用户设置、状态、用户发言、Agent Loop、工具结果及最终输出都在运行上下文中，按组件顺序展示。模板只保存可复用的结构、默认内容与字段默认值。组件可以新增、排序、启停、重新绑定来源，并分别配置压缩策略。内部内容可编辑，外部工具的执行契约由提供方同步；工具描述和参数解释可以在工作台单独配置，Skill 定义仍由提供方同步。
 
 现在直接保存当前上下文。已移除事件溯源、分支、历史版本选择、快照和构建存档；编辑用户发言会直接修改模型输入，已有工具记录保持原样，宿主工具的真实状态不受影响。
 
@@ -71,6 +79,17 @@ with httpx.Client(base_url="http://127.0.0.1:8010/api") as http:
 ```
 
 通用客户端在 `context_protocol/client.py`，框架适配在 `context_protocol/adapters/langchain.py`，业务测试工具在 `examples/langchain_agent.py`。核心协议、编译器和存储服务均不依赖 LangChain。
+
+### MCP 工具
+
+MCP Server 只提供工具，上下文仍由本项目保存和编译。`examples/mcp_agent.py` 用 `langchain-mcp-adapters` 加载 MCP 工具，交给同一套 `ContextAgent`，并提供异步 `arun()`（MCP 工具只实现协程）：
+
+```powershell
+.venv/Scripts/python.exe -X utf8 -m examples.mcp_agent --mock --smoke-test
+.venv/Scripts/python.exe -X utf8 -m examples.mcp_agent --mcp-config mcp.json --template TEMPLATE_ID --instance researcher --interactive
+```
+
+示例使用真实 stdio MCP server，验证 MCP `add`、状态持久化，以及换一个新 Agent 后从同一上下文读取结果。详见 [MCP 接入](docs/mcp-integration.md)。
 
 ```powershell
 .venv/Scripts/python.exe -m pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple -r requirements-agent.txt

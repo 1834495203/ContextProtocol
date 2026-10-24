@@ -7,6 +7,7 @@ class ToolSpec(Model):
     name: str
     description: str
     input_schema: JsonObject
+    tool_ref: str | None = None
 
 
 class ToolCatalogEntry(ToolSpec):

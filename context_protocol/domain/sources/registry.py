@@ -37,9 +37,11 @@ class FieldsSource:
 class ToolsSource:
     name = "tools"
     def extract(self, state: ContextState, group: Group) -> list[SourceItem]:
+        # Preserve legacy builtin metadata in storage, but require explicit re-registration.
         return [ToolSourceItem(id=key, seq=value.seq, origin="external", content=ToolCatalogEntry(
-                name=value.name, description=value.description, input_schema=value.input_schema, builtin=value.builtin))
-                for key, value in sorted(state.tools.items())]
+                name=value.name, description=value.description, input_schema=value.input_schema, builtin=value.builtin,
+                tool_ref=value.tool_ref))
+                for key, value in sorted(state.tools.items()) if not value.builtin]
 
 class MessagesSource:
     name = "messages"

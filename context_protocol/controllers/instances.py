@@ -5,6 +5,7 @@ from ..models.requests import SessionInput, BuildInput, InstanceInput, ConnectIn
 from ..models.commands import ContextUpdate
 from ..models.persistence import InstanceInfo, InstanceView, UpdateResult, ConnectionResult
 from ..models.compilation import CompiledContext
+from ..models.host import PrepareInput, PreparedContext
 from ..services.compilation import InstanceExport
 from .dependencies import ApplicationDep, current_only, optional_id
 
@@ -43,17 +44,23 @@ def build(sid: UUID, body: BuildInput, store: ApplicationDep) -> CompiledContext
     return store.build(str(sid), body.budget_chars)
 
 
+@router.post("/api/sessions/{sid}/prepare")
+def prepare(sid: UUID, body: PrepareInput, store: ApplicationDep) -> PreparedContext:
+    return store.compilation.prepare(str(sid), body)
+
+
 @router.get("/api/sessions/{sid}/preview")
-def preview(sid: UUID, request: Request, store: ApplicationDep, budget_chars: int = Query(24000, ge=100, le=2000000)) -> CompiledContext:
+def preview(sid: UUID, request: Request, store: ApplicationDep, budget_chars: int = Query(24000, ge=100, le=2000000),
+            binding_id: str | None = None) -> CompiledContext:
     current_only(request)
-    return store.build(str(sid), budget_chars)
+    return store.compilation.instance(str(sid), budget_chars, binding_id)
 
 
 @router.get("/api/sessions/{sid}/export")
-def export(sid: UUID, request: Request, response: Response, store: ApplicationDep) -> InstanceExport:
+def export(sid: UUID, request: Request, response: Response, store: ApplicationDep, binding_id: str | None = None) -> InstanceExport:
     current_only(request)
     response.headers["Content-Disposition"] = f'attachment; filename="context-{sid}-current.json"'
-    return store.export(str(sid))
+    return store.compilation.export_instance(str(sid), binding_id)
 
 
 @router.get("/api/instances/unassigned")

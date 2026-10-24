@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Annotated, Literal
 from pydantic import ConfigDict, Field, JsonValue, RootModel, StrictBool, model_validator
-from .context import Model, Group, JsonObject, StateValue, StateDefinition
+from .context import Model, Group, JsonObject, StateValue, StateDefinition, RegisteredTool, ToolPrompt
 
 Identifier = Annotated[str, Field(min_length=1, max_length=200)]
 
@@ -37,12 +37,7 @@ class RegisterTool(Model):
     name: Identifier
     description: str
     input_schema: JsonObject
-
-    @model_validator(mode="after")
-    def reserved_name(self):
-        if self.name == "context.state.set":
-            raise ValueError("context.state.set 是保留的内置工具")
-        return self
+    tool_ref: str | None = Field(default=None, max_length=265, pattern=r"^[a-z][a-z0-9_-]{0,63}/[^/]+$")
 
 class UnregisterTool(Model):
     name: Identifier
@@ -98,6 +93,62 @@ class Command(Model):
         if len(json.dumps(self.payload.model_dump(mode="json", by_alias=True), ensure_ascii=False, allow_nan=False).encode()) > 2_000_000:
             raise ValueError("单次更新不能超过 2 MB")
         return self
+
+
+class OpenHost(Model):
+    binding_id: Identifier
+    host_id: Identifier
+    lease_seconds: int = Field(default=3600, ge=30, le=86400)
+
+
+class BindingReference(Model):
+    binding_id: Identifier
+
+
+class SyncProvider(BindingReference):
+    provider_id: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+    kind: Literal["mcp", "local", "http", "langchain"]
+    status: Literal["pending", "ready", "error"] = "ready"
+    tools: list[RegisteredTool] = Field(default_factory=list, max_length=10000)
+    expected_binding_revision: int | None = Field(default=None, ge=0)
+
+
+class HostOpenCommand(Command):
+    type: Literal["host.open"] = "host.open"
+    payload: OpenHost
+
+
+class HostCloseCommand(Command):
+    type: Literal["host.close"] = "host.close"
+    payload: BindingReference
+
+
+class HostRenewCommand(Command):
+    type: Literal["host.renew"] = "host.renew"
+    payload: BindingReference
+
+
+class ProviderSyncCommand(Command):
+    type: Literal["provider.sync"] = "provider.sync"
+    payload: SyncProvider
+
+
+class SetToolPrompt(ToolPrompt):
+    base_schema: JsonObject | None = None
+
+
+class ToolPromptSetCommand(Command):
+    type: Literal["tool.prompt.set"] = "tool.prompt.set"
+    payload: SetToolPrompt
+
+
+class DeleteToolPrompt(Model):
+    id: str = Field(min_length=1, max_length=265)
+
+
+class ToolPromptDeleteCommand(Command):
+    type: Literal["tool.prompt.delete"] = "tool.prompt.delete"
+    payload: DeleteToolPrompt
 
 class GroupUpsertCommand(Command):
     type: Literal["group.upsert"] = "group.upsert"
@@ -189,7 +240,9 @@ class TraceAppendCommand(Command):
 
 
 UpdateCommand = Annotated[
-    GroupUpsertCommand
+    HostOpenCommand | HostCloseCommand | HostRenewCommand | ProviderSyncCommand
+    | ToolPromptSetCommand | ToolPromptDeleteCommand
+    | GroupUpsertCommand
     | GroupReorderCommand
     | GroupDeleteCommand
     | BlockUpsertCommand

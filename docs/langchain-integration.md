@@ -1,5 +1,7 @@
 # LangChain 接入当前上下文
 
+适配器不再自动创建状态工具。使用 `tool_providers={"context": ContextTools(context).tools}` 显式接入；`examples/langchain_agent.py` 已这样配置。记忆工具同样可选，详见 [上下文工具提供方](context-tools.md)。
+
 通用 HTTP 客户端：`context_protocol/client.py`；可复用适配器：`context_protocol/adapters/langchain.py`；业务工具与测试入口：`examples/langchain_agent.py`。核心协议与数据库服务不依赖 LangChain。
 
 ```powershell
@@ -48,3 +50,8 @@
 ```
 
 同一命令再次启动会通过模板和简名连接同一实例，不重新初始化状态。加 --existing-only 可禁止创建。模板实例表内“Agent 接入”提供对应 SDK 与 HTTP 示例，SDK 为 ContextClient.connect(http, template_id, slug, create=False)。简名变更需同步更新宿主配置；内部 UUID 接入仍兼容。
+
+
+## MCP 工具与异步轮次
+
+MCP 工具通常只提供异步实现，因此适配器同时实现了 `awrap_model_call` / `awrap_tool_call`，对应入口是 `ContextAgent.arun(prompt)`。同步 `run(prompt)` 仍用于普通同步工具。MCP 工具加载、注册和长期实例复用见 [MCP 接入](mcp-integration.md)。

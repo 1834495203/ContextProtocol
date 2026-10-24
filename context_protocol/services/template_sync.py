@@ -25,6 +25,7 @@ class TemplateSynchronizer:
     def apply(self, before: ContextState, after: ContextState, target: ContextState, revision: int) -> None:
         merge_records(before.blocks, after.blocks, target.blocks)
         merge_records(before.items, after.items, target.items)
+        merge_records(before.tool_prompts, after.tool_prompts, target.tool_prompts)
         old_groups = {g.id: g for g in before.groups}
         new_groups = {g.id: g for g in after.groups}
         groups = {g.id: g for g in target.groups}

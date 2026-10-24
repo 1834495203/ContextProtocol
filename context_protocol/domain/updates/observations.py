@@ -1,6 +1,6 @@
 from ...models.commands import (ToolRegisterCommand, ToolUnregisterCommand, MessageAppendCommand,
     MessageUpdateCommand, ToolCallCommand, ToolResultCommand, MemoryAppendCommand, TraceAppendCommand)
-from ...models.context import ToolDefinition, Message, ToolCall, Memory, Trace, STATE_TOOL
+from ...models.context import ToolDefinition, Message, ToolCall, Memory, Trace
 from .base import UpdateContext, UpdateHandler
 
 
@@ -11,7 +11,8 @@ class RegisterToolHandler(UpdateHandler[ToolRegisterCommand]):
         context.require_producer()
         payload = command.payload
         context.state.tools[payload.name] = ToolDefinition(name=payload.name, description=payload.description,
-                                                          input_schema=payload.input_schema, seq=context.seq)
+                                                          input_schema=payload.input_schema, seq=context.seq,
+                                                          tool_ref=payload.tool_ref)
 
 
 class UnregisterToolHandler(UpdateHandler[ToolUnregisterCommand]):
@@ -19,8 +20,6 @@ class UnregisterToolHandler(UpdateHandler[ToolUnregisterCommand]):
 
     def handle(self, context: UpdateContext, command: ToolUnregisterCommand) -> None:
         context.require_producer()
-        if command.payload.name == STATE_TOOL.name:
-            raise ValueError("内置状态工具不能移除")
         context.state.tools.pop(command.payload.name, None)
 
 

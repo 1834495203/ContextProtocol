@@ -91,6 +91,7 @@ class ContextCompiler:
             for item in section.items:
                 if isinstance(item, ToolSourceItem) and item.content.name not in tools:
                     spec = item.content
-                    result.tools.append(ToolSpec(name=spec.name, description=spec.description, input_schema=spec.input_schema))
+                    result.tools.append(ToolSpec(name=spec.name, description=spec.description, input_schema=spec.input_schema,
+                                                 tool_ref=spec.tool_ref))
                     tools.add(spec.name)
         return result

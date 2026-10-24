@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, RootModel, model_validator
@@ -98,6 +99,42 @@ class ToolDefinition(Model):
     builtin: bool = False
     origin: Literal["external"] = "external"
     seq: int = 0
+    tool_ref: str | None = None
+
+
+class RegisteredTool(Model):
+    """Provider contract. Callables, URLs and credentials remain in the host."""
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=200, pattern=r"^[^/]+$")
+    description: str = ""
+    input_schema: JsonObject
+    model_name: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class ProviderCatalog(Model):
+    kind: Literal["mcp", "local", "http", "langchain"]
+    status: Literal["pending", "ready", "error"] = "pending"
+    tools: list[RegisteredTool] = Field(default_factory=list)
+
+
+class HostBinding(Model):
+    id: str
+    host_id: str
+    revision: int = 0
+    active: bool = True
+    expires_at: datetime
+    lease_seconds: int = 3600
+    providers: dict[str, ProviderCatalog] = Field(default_factory=dict)
+
+
+class ToolPrompt(Model):
+    model_config = ConfigDict(extra="forbid")
+    tool_ref: str = Field(max_length=265, pattern=r"^[a-z][a-z0-9_-]{0,63}/[^/]+$")
+    description: str | None = None
+    parameter_descriptions: dict[str, str] = Field(default_factory=dict)
+    enabled: bool = True
+    required: bool = False
+    contract_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class Message(Model):
@@ -167,6 +204,9 @@ class ContextState(Model):
     fields: dict[str, StateField] = Field(default_factory=dict)
     field_definitions: dict[str, StateDefinition] = Field(default_factory=dict)
     tools: dict[str, ToolDefinition] = Field(default_factory=dict)
+    host_bindings: dict[str, HostBinding] = Field(default_factory=dict)
+    tool_catalog: dict[str, RegisteredTool] = Field(default_factory=dict)
+    tool_prompts: dict[str, ToolPrompt] = Field(default_factory=dict)
     messages: list[Message] = Field(default_factory=list)
     calls: dict[str, ToolCall] = Field(default_factory=dict)
     memories: list[Memory] = Field(default_factory=list)
@@ -186,6 +226,7 @@ class StateToolArguments(StateValue):
     key: str
 
 
+# Legacy description only. New contexts never advertise an executor implicitly.
 STATE_TOOL = ToolDefinition(name="context.state.set", description="创建或更新当前上下文的自定义状态字段，由宿主适配器执行。",
                             input_schema=JsonObject(StateToolArguments.model_json_schema()), builtin=True)
 
@@ -201,6 +242,4 @@ DEFAULT_GROUPS = (
 
 
 def new_state() -> ContextState:
-    state = ContextState(groups=[group.model_copy(deep=True) for group in DEFAULT_GROUPS])
-    state.tools[STATE_TOOL.name] = STATE_TOOL.model_copy(deep=True)
-    return state
+    return ContextState(groups=[group.model_copy(deep=True) for group in DEFAULT_GROUPS])

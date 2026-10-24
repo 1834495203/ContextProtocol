@@ -10,6 +10,7 @@ let sessionId=null, sessionData=null, artifact=null, sessions=[], editorSave=nul
 let databaseLabel='存储';
 let templateState=null, templateRevision=null;
 let templates=[], objectType='instance', view='templates', activeTemplateId=null;
+let toolBindingId=null;
 async function api(path,options={}){
  const res=await fetch('/api'+path,{headers:{'Content-Type':'application/json'},...options});const body=await res.json();
  if(!res.ok)throw new Error(typeof body.detail==='string'?body.detail:pretty(body.detail||body));return body;
@@ -42,16 +43,46 @@ function renderScope(){const template=templates.find(t=>t.id===activeTemplateId)
  if(!template)return;
  $('#template-instances-panel').innerHTML=`<div class="section-heading"><div><h2>${esc(template.name)} <span class="tag">模板 / 实例</span></h2><p>实例按模板归属管理，简名在本模板内唯一。</p></div><div class="scope-actions"><button class="button" data-edit-template="${template.id}">模板配置</button><button class="button primary" data-use-template="${template.id}">＋ 新建实例</button></div></div><div class="instance-table-wrap"><table class="instance-table"><thead><tr><th>实例简名</th><th>名称</th><th>Agent 标记</th><th>操作</th></tr></thead><tbody>${rows.map(r=>`<tr class="${objectType==='instance'&&r.id===sessionId?'selected':''}"><td><code>${esc(r.slug||'待设置')}</code></td><td>${esc(r.name)}</td><td>${esc(r.agent_id||'未指定')}</td><td><button class="text-button" data-session="${r.id}">查看上下文</button><button class="text-button" data-connect-instance="${r.id}">接入代码</button></td></tr>`).join('')||'<tr><td colspan="4" class="muted">还没有实例。新建实例并设置简名，再让 Agent 接入。</td></tr>'}</tbody></table></div>`;
 }
-async function selectSession(id){objectType='instance';sessionId=id;await refresh();history.replaceState(null,'','?instance='+id);await setView('workspace');await loadSessions();}
-async function selectTemplate(id){objectType='template';sessionId=id;activeTemplateId=id;await refresh();history.replaceState(null,'','?template='+id);await setView('workspace');await loadSessions();}
+async function selectSession(id){objectType='instance';sessionId=id;toolBindingId=null;await refresh();history.replaceState(null,'','?instance='+id);await setView('workspace');await loadSessions();}
+async function selectTemplate(id){objectType='template';sessionId=id;activeTemplateId=id;toolBindingId=null;await refresh();history.replaceState(null,'','?template='+id);await setView('workspace');await loadSessions();}
 async function refresh(){const generation=++refreshGeneration,sid=sessionId,kind=objectType;
- const current=await api(base());const compiled=await api(base()+'/preview?budget_chars='+Number($('#budget').value||24000));
+ const current=await api(base());
+ const bindings=Object.values(current.state.host_bindings||{});
+ if(kind==='instance'&&bindings.length&&!bindings.some(b=>b.id===toolBindingId))toolBindingId=(bindings.find(b=>b.active&&Date.parse(b.expires_at)>Date.now())||bindings[0]).id;
+ const compiled=await api(base()+'/preview?budget_chars='+Number($('#budget').value||24000)+(kind==='instance'&&toolBindingId?'&binding_id='+encodeURIComponent(toolBindingId):''));
  if(generation!==refreshGeneration||sid!==sessionId||kind!==objectType)return;
  if(current.revision!==compiled.revision){return refresh();}
  const templateDocument=kind==='template'?current:current.binding?await api('/templates/'+current.binding.template_id):null;
  templateState=templateDocument?.state||null;templateRevision=templateDocument?.revision??null;
  if(generation!==refreshGeneration)return;
- sessionData={...current,session:current.template||current.session};artifact=compiled;renderStatePanel();renderStats();renderGroups();renderPreview();renderProtocol();renderObject();renderScope();}
+ sessionData={...current,session:current.template||current.session};artifact=compiled;renderStatePanel();renderToolPanel();renderStats();renderGroups();renderPreview();renderProtocol();renderObject();renderScope();}
+
+function toolDefinitions(){
+ const result=new Map(Object.entries(sessionData.state.tool_catalog||{}));const binding=sessionData.state.host_bindings?.[toolBindingId];
+ if(binding){for(const [pid,p] of Object.entries(binding.providers)){for(const t of p.tools)result.set(pid+'/'+t.name,t);}}
+ else{for(const t of Object.values(sessionData.state.tools||{}))result.set('legacy/'+t.name,t);}
+ return result;
+}
+function renderToolPanel(){
+ const bindings=Object.values(sessionData.state.host_bindings||{}),binding=sessionData.state.host_bindings?.[toolBindingId];
+ const definitions=toolDefinitions(),prompts=sessionData.state.tool_prompts||{};
+ const refs=[...new Set([...definitions.keys(),...Object.keys(prompts)])];
+ const live=binding?.active&&Date.parse(binding.expires_at)>Date.now();
+ const options=bindings.map(b=>`<option value="${esc(b.id)}" ${b.id===toolBindingId?'selected':''}>${esc(b.host_id)} · ${esc(b.id.slice(0,8))} · ${b.active&&Date.parse(b.expires_at)>Date.now()?'连接有效':'已关闭或过期'}</option>`).join('');
+ const providerStatus=binding?Object.entries(binding.providers).map(([id,p])=>`${id} (${p.kind}): ${{pending:'待发现',ready:'已确认',error:'发现失败'}[p.status]} · ${p.tools.length} 个工具`).join('；'):'';
+ $('#tool-panel').innerHTML=`<div class="section-heading"><div><h2>工具绑定与提示词 <span class="tag">MCP 优先</span></h2><p>连接 MCP 或注册本地方法后即可编辑，无需先运行模型。描述配置可复用，实际工具按宿主连接隔离。</p></div><button class="button" data-new-tool-prompt="1">＋ 工具提示词</button></div>${bindings.length?`<label class="field">预览宿主绑定<select id="tool-binding">${options}</select></label><p>${esc(providerStatus||'尚未同步任何提供方目录')} · 修订 ${binding?.revision??0}</p>`:'<p class="muted">尚无宿主绑定。可先填写工具提示词；MCP 接入与本地注册代码见协议文档。当前显示旧版目录预览。</p>'}<div class="instance-table-wrap"><table class="instance-table"><thead><tr><th>工具身份</th><th>当前绑定</th><th>描述配置</th><th>操作</th></tr></thead><tbody>${refs.map(ref=>{const p=prompts[ref],t=definitions.get(ref),provider=binding?.providers[ref.split('/')[0]];const status=binding?(!live?'绑定已失效':!provider?'缺失':provider.status!=='ready'?'未确认':provider.tools.some(item=>item.name===ref.slice(ref.indexOf('/')+1))?'已发现':'缺失'):(t?'目录已知':'未绑定');return `<tr><td><code>${esc(ref)}</code><small>${esc(t?.description||'可提前配置，等待宿主注册')}</small></td><td>${status}${p?.required?' · 必需':''}</td><td>${p?(p.enabled?'已配置':'已禁用'):'使用来源描述'}</td><td><button class="text-button" data-tool-prompt="${esc(ref)}">编辑描述与参数解释</button>${p?`<button class="text-button" data-delete-tool-prompt="${esc(ref)}">恢复来源描述</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="4" class="muted">暂无工具。推荐通过 MCP 自动发现，或在宿主中注册本地方法。</td></tr>'}</tbody></table></div>`;
+ $('#tool-binding')?.addEventListener('change',e=>{toolBindingId=e.target.value;refresh().catch(report);});
+}
+function editToolPrompt(ref=''){
+ captureScopeRevision();const t=toolDefinitions().get(ref),p=sessionData.state.tool_prompts?.[ref];
+ dialog('工具提示词配置',scopeField()+field('工具身份（provider_id/tool_name）','tool_ref',ref)+select('工具启用','enabled',{true:'启用',false:'禁用'},String(p?.enabled??true))+select('工具要求','required',{false:'可选：缺失时不暴露给模型',true:'必需：缺失时阻止模型调用'},String(p?.required??false))+field('模型看到的工具描述','description',p?.description??t?.description??'','textarea')+field('参数解释：JSON Pointer → 描述','parameter_descriptions',pretty(p?.parameter_descriptions||{}),'textarea','例如 {"/properties/query":"包含模块名或错误关键词的检索词"}。只修改解释，不改变类型和必填项。')+(t?`<details><summary>原始参数 Schema</summary><pre>${esc(pretty(t.input_schema))}</pre></details>`:'<p class="dialog-note">当前没有此工具的执行定义。配置会保留，工具接入后自动匹配。</p>'),async d=>{
+  if(ref&&d.tool_ref!==ref)throw new Error('已有工具身份不能修改，请新增配置。');
+  const descriptions=JSON.parse(d.parameter_descriptions);if(!descriptions||Array.isArray(descriptions)||typeof descriptions!=='object'||Object.values(descriptions).some(v=>typeof v!=='string'))throw new Error('参数解释必须为字符串值的 JSON 对象。');
+  const payload={tool_ref:d.tool_ref,description:d.description,parameter_descriptions:descriptions,enabled:d.enabled==='true',required:d.required==='true'};
+  if(t)payload.base_schema=t.input_schema;else if(p?.contract_sha256)payload.contract_sha256=p.contract_sha256;
+  await scopedAppend(d.scope,'tool.prompt.set',payload);
+ });
+}
 function renderStats(){$('#stat-session').textContent=sessionData.session.name;$('#stat-session').title=sessionData.session.name;$('#stat-revision').textContent='修订 '+sessionData.revision+' · 用于防止并发覆盖';$('#stat-groups').textContent=artifact.groups.length;$('#stat-chars').textContent=fmt(artifact.chars);$('#stat-budget').textContent='预算 '+fmt(artifact.budget_chars)+' 字符';$('#stat-messages').innerHTML=artifact.model_input.messages.length+' <i>条消息</i>';$('#stat-tools').textContent=artifact.model_input.tools.length+' 个工具定义';}
 function renderPreview(){$('#prompt').textContent=pretty(artifact.model_input);$('#warnings').innerHTML=artifact.warnings.map(w=>`<div class="warning">${esc(w)}</div>`).join('');}
 function inputMessage(m,g){
@@ -64,10 +95,10 @@ function renderGroups(){
  $('#groups').innerHTML=artifact.groups.map((source,i)=>{
  const g={...source,label:source.label==='会话与 Agent Loop'?'对话与 Agent Loop':source.label};
  const external=g.origin==='external';const tools=g.items.filter(t=>t.type==='tool');
- const catalog=tools.length?`<div class="selected-tools">${tools.map(t=>`<details class="tool-definition" open><summary><code>${esc(t.content.name)}</code><span class="origin-badge external">外部 · 只读</span></summary><p>${esc(t.content.description)}</p><pre>${esc(pretty(t.content.input_schema))}</pre></details>`).join('')}</div>`:'';
+ const catalog=tools.length?`<div class="selected-tools">${tools.map(t=>`<details class="tool-definition" open><summary><code>${esc(t.content.name)}</code><span class="origin-badge external">来源定义 · 描述可配置</span></summary><p>${esc(t.content.description)}</p><pre>${esc(pretty(t.content.input_schema))}</pre></details>`).join('')}</div>`:'';
  const messages=g.input_messages.map(m=>inputMessage(m,g)).join('');
  const body=tools.length?catalog+`<details class="transport-content"><summary>此组件对应的消息内容</summary>${messages}</details>`:messages||`<p class="empty-component">${esc(g.reason||'当前没有输入内容，可编辑组件或绑定数据。')}</p>`;
- return `<article class="group-card ${!g.enabled?'group-disabled':''}" data-component="${g.id}"><div class="group-header"><div class="group-name"><span class="drag-handle" draggable="true" data-drag="${g.id}" title="拖动排序">⠿</span><div><strong>${esc(g.label)}</strong><div class="group-id">${String(i+1).padStart(2,'0')} / ${esc(g.id)} · ${esc(g.kind)}</div></div></div><div class="group-actions"><button class="text-button" data-move="${g.id}" data-delta="-1" aria-label="上移${esc(g.label)}" ${i===0?'disabled':''}>↑</button><button class="text-button" data-move="${g.id}" data-delta="1" aria-label="下移${esc(g.label)}" ${i===artifact.groups.length-1?'disabled':''}>↓</button><button class="switch ${g.enabled?'on':''}" data-toggle="${g.id}" aria-label="${g.enabled?'禁用':'启用'}${esc(g.label)}" aria-pressed="${g.enabled}"></button></div></div><div class="component-meta"><span class="origin-badge ${external?'external':'internal'}">${external?'外部 · 内容只读':'内部 · 可编辑'}</span><span>${roles[g.role]}</span><button class="text-button strategy" data-settings="${g.id}">${strategies[g.policy.strategy]}</button>${g.reason?`<span>${esc(g.reason)}</span>`:''}</div><details class="component-input" open><summary>模型输入 · ${esc(g.label)}</summary>${body}</details><div class="group-bottom"><span>${fmt(g.chars)} 字符 · ${g.included_count}/${g.original_count} 项</span><div><button class="text-button" data-settings="${g.id}">组件设置</button><button class="text-button" data-content="${g.id}">${external?'查看来源':g.role==='conversation'?(objectType==='template'?'运行时数据来源':'添加发言'):'编辑内容'} ↗</button></div></div></article>`;
+ return `<article class="group-card ${!g.enabled?'group-disabled':''}" data-component="${g.id}"><div class="group-header"><div class="group-name"><span class="drag-handle" draggable="true" data-drag="${g.id}" title="拖动排序">⠿</span><div><strong>${esc(g.label)}</strong><div class="group-id">${String(i+1).padStart(2,'0')} / ${esc(g.id)} · ${esc(g.kind)}</div></div></div><div class="group-actions"><button class="text-button" data-move="${g.id}" data-delta="-1" aria-label="上移${esc(g.label)}" ${i===0?'disabled':''}>↑</button><button class="text-button" data-move="${g.id}" data-delta="1" aria-label="下移${esc(g.label)}" ${i===artifact.groups.length-1?'disabled':''}>↓</button><button class="switch ${g.enabled?'on':''}" data-toggle="${g.id}" aria-label="${g.enabled?'禁用':'启用'}${esc(g.label)}" aria-pressed="${g.enabled}"></button></div></div><div class="component-meta"><span class="origin-badge ${external?'external':'internal'}">${external?(g.sources.includes('tools')?'执行契约来自提供方 · 描述可配置':'外部 · 内容只读'):'内部 · 可编辑'}</span><span>${roles[g.role]}</span><button class="text-button strategy" data-settings="${g.id}">${strategies[g.policy.strategy]}</button>${g.reason?`<span>${esc(g.reason)}</span>`:''}</div><details class="component-input" open><summary>模型输入 · ${esc(g.label)}</summary>${body}</details><div class="group-bottom"><span>${fmt(g.chars)} 字符 · ${g.included_count}/${g.original_count} 项</span><div><button class="text-button" data-settings="${g.id}">组件设置</button><button class="text-button" data-content="${g.id}">${external?'查看来源':g.role==='conversation'?(objectType==='template'?'运行时数据来源':'添加发言'):'编辑内容'} ↗</button></div></div></article>`;
  }).join('');
 }
 function renderObject(){const isTemplate=objectType==='template';activeTemplateId=isTemplate?sessionId:sessionData.binding?.template_id||null;renderTemplates();
@@ -92,9 +123,13 @@ async function setView(v){view=v;$('#view-templates').classList.toggle('hidden',
  else {renderProtocol();$('#page-title').textContent='协议与接入';$('#page-description').textContent='模板定义配置，实例承载运行数据。';}
  renderScope();
 }
-function renderProtocol(){const target=objectType==='instance'&&sessionId?base():'/sessions/CONTEXT_ID';
- $('#protocol-example').textContent='GET '+location.origin+'/api/templates\n\nPOST '+location.origin+'/api/sessions\n\n'+pretty({name:'researcher 的上下文',slug:'researcher',template_id:templates[0]?.id||'TEMPLATE_ID',agent_id:'researcher'})+'\n\nPOST '+location.origin+'/api'+target+'/ingest\n\n'+pretty({type:'tool.register',update_id:'unique-id',source:'your-adapter',payload:{name:'documents.search',description:'检索文档',input_schema:{type:'object',properties:{query:{type:'string'}}}}});
- $('#build-example').textContent='POST '+location.origin+'/api'+target+'/compile\n\n'+pretty({budget_chars:24000});$('#state-example').textContent=pretty({type:'state.set',update_id:'state-1',payload:{key:'phase',value:'实现',value_type:'string'}});
+function renderProtocol(){
+ const target=objectType==='instance'&&sessionId?base():'/sessions/CONTEXT_ID';
+ const bindingId=toolBindingId||'CONNECTION_ID';
+ const endpoint='POST '+location.origin+'/api'+target+'/ingest';
+ $('#protocol-example').textContent='GET '+location.origin+'/api/protocol\n\n'+endpoint+'\n'+pretty({protocol_version:'0.1',type:'host.open',update_id:'open-unique-id',source:'your-host',payload:{binding_id:bindingId,host_id:'your-environment'}})+'\n\n'+endpoint+'\n'+pretty({protocol_version:'0.1',type:'provider.sync',update_id:'sync-unique-id',source:'your-host',payload:{binding_id:bindingId,provider_id:'documents',kind:'mcp',status:'ready',tools:[{name:'search',description:'检索文档',input_schema:{type:'object',properties:{query:{type:'string',description:'检索关键词'}},required:['query']}}]}});
+ $('#build-example').textContent='POST '+location.origin+'/api'+target+'/prepare\n\n'+pretty({binding_id:bindingId,supported_versions:['0.1'],budget_chars:24000});
+ $('#state-example').textContent=pretty({type:'state.set',update_id:'state-1',payload:{key:'phase',value:'实现',value_type:'string'}});
 }
 function field(label,name,value='',kind='input',note=''){return `<label class="field">${label}${kind==='textarea'?`<textarea id="f-${name}" name="${name}">${esc(value)}</textarea>`:`<input id="f-${name}" name="${name}" value="${esc(value)}">`}${note?`<small>${note}</small>`:''}</label>`;}
 function select(label,name,choices,value){return `<label class="field">${label}<select name="${name}">${Object.entries(choices).map(([k,v])=>`<option value="${esc(k)}" ${k===value?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`;}
@@ -189,7 +224,7 @@ bind('#save-template',()=>newTemplateDialog(null,sessionId));
 bind('#rename-template',()=>dialog('模板信息',field('模板名称','name',sessionData.session.name)+field('用途说明','description',sessionData.session.description||'','textarea'),async d=>{await post(base()+'/metadata',{...d,expected_revision:sessionData.revision});}));
 bind('#add-prompt',promptDialog);bind('#add-group',()=>componentDialog());bind('#add-message',()=>messageDialog());
 bind('#build',async()=>{await refresh();notify('已按当前配置重新编译');});
-bind('#export',async()=>{const data=await api(base()+'/export');const url=URL.createObjectURL(new Blob([pretty(data)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=(objectType==='template'?'template-':'context-')+sessionId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+bind('#export',async()=>{const data=await api(base()+'/export'+(objectType==='instance'&&toolBindingId?'?binding_id='+encodeURIComponent(toolBindingId):''));const url=URL.createObjectURL(new Blob([pretty(data)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=(objectType==='template'?'template-':'context-')+sessionId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 bind('#copy-prompt',async()=>{await navigator.clipboard.writeText(pretty(artifact.model_input));notify('已复制模型输入');});
 $('#budget').addEventListener('change',()=>refresh().catch(report));
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;Promise.resolve().then(async()=>{const d=b.dataset;
@@ -201,6 +236,8 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
  else if(d.field!==undefined)editField(d.field);else if(d.removeField)deleteScoped('state.delete',{key:d.removeField},d.removeField);
  else if(d.fieldValue)editFieldValue(d.fieldValue);
  else if(d.editMessage)messageDialog(Number(d.editMessage));
+ else if(d.newToolPrompt)editToolPrompt();else if(d.toolPrompt)editToolPrompt(d.toolPrompt);
+ else if(d.deleteToolPrompt)deleteScoped('tool.prompt.delete',{id:d.deleteToolPrompt},d.deleteToolPrompt);
  }).catch(report);});
 $('#groups').addEventListener('dragstart',e=>{dragId=e.target.dataset.drag;if(!dragId)e.preventDefault();});
 $('#groups').addEventListener('dragover',e=>{if(dragId)e.preventDefault();});
