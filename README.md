@@ -1,5 +1,7 @@
 # Context Protocol
 
+推荐使用[服务端工具网关](docs/tool-gateway.md)：在工作台“工具接入”中添加 MCP / 本地 / 上下文来源，模板或实例选择后，Agent 只调用 `/prepare` 和 `/tools/call`，无需自行注册工具或连接 MCP。现有宿主直连方式保留兼容。
+
 状态和记忆工具现为[可选上下文工具提供方](docs/context-tools.md)：宿主显式选择并注册，支持本地调用、LangChain 普通提供方和独立 MCP Server。新实例不再自动注入工具，`GET /api/context-tools` 仅发现定义。
 
 让开发 AI 创建 Agent：读取 `GET /api/agent-guide`（JSON）或 `GET /api/agent-guide?format=markdown`。接口集中提供当前服务地址、OpenAPI/协议入口、接入规则、请求示例、数据 Schema 和完整 MCP/JS 示例源码；只读且无需数据库即可获取。
@@ -41,12 +43,12 @@ python -m venv .venv
 $env:CONTEXT_DATABASE_URL = 'postgresql://context:context_local@127.0.0.1:5433/context_protocol'
 ```
 
-应用默认只绑定本机，是单用户工具，尚无身份认证。工作台本身不调用模型或执行业务工具。Agent 标记仅便于区分实例，不提供认证或权限隔离。
+应用默认只绑定本机，是单用户工具，尚无身份认证。Web 服务在集中式模式中负责工具连接与执行，模型仍由 Agent 调用。Agent 标记仅便于区分实例，不提供认证或权限隔离。
 
 ## 上下文与 Agent 的关系
 
 ```text
-宿主同步用户发言、模型输出、工具定义与调用结果
+Agent 回写用户发言和模型输出；工具由服务端接入与执行
                     ↓
             当前上下文（数据库）
                     ↓
@@ -59,7 +61,7 @@ $env:CONTEXT_DATABASE_URL = 'postgresql://context:context_local@127.0.0.1:5433/c
 
 默认六个组件都是初始配置，可以修改或删除；`kind` 可自定义，`sources` 可扩展，`role` 指定系统指令、上下文数据或对话记录。对话记录本身也是可排序的组件，用户发言、模型调用与工具结果在其内部按输入消息顺序排列。思考仅记录宿主实际提供的内容。
 
-前端和 LangChain 适配器读取同一份 `model_input`。工具名、工具可用性及提供商的原生请求格式由宿主映射；例如 `context.state.set` 在 LangChain 中映射为 `context_state_set`。工作台展示通用模型输入，并提供 JSON 复制与当前上下文导出。
+前端和 LangChain 适配器读取同一份 `model_input`。集中式工具的名称、可用性与执行路由由服务端维护；Agent 只映射模型提供商的原生请求格式。宿主直连模式继续可选。工作台展示通用模型输入，并提供 JSON 复制与当前上下文导出。
 
 [组件与来源](docs/composition.md) · [协议与接口](docs/protocol.md) · [LangChain 接入](docs/langchain-integration.md)
 

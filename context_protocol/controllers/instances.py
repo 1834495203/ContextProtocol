@@ -45,7 +45,9 @@ def build(sid: UUID, body: BuildInput, store: ApplicationDep) -> CompiledContext
 
 
 @router.post("/api/sessions/{sid}/prepare")
-def prepare(sid: UUID, body: PrepareInput, store: ApplicationDep) -> PreparedContext:
+async def prepare(sid: UUID, body: PrepareInput, request: Request, store: ApplicationDep) -> PreparedContext:
+    if body.binding_id is None and store.current(str(sid)).state.tool_sources is not None:
+        return await request.app.state.gateway.prepare(str(sid), body)
     return store.compilation.prepare(str(sid), body)
 
 

@@ -120,6 +120,7 @@ class ProviderCatalog(Model):
 class HostBinding(Model):
     id: str
     host_id: str
+    managed_by: Literal['host', 'gateway'] = 'host'
     revision: int = 0
     active: bool = True
     expires_at: datetime
@@ -152,6 +153,7 @@ class Message(Model):
 
 class ToolCall(Model):
     call_id: str
+    preparation_id: str | None = None
     name: str
     arguments: JsonObject
     seq: int
@@ -207,6 +209,7 @@ class ContextState(Model):
     host_bindings: dict[str, HostBinding] = Field(default_factory=dict)
     tool_catalog: dict[str, RegisteredTool] = Field(default_factory=dict)
     tool_prompts: dict[str, ToolPrompt] = Field(default_factory=dict)
+    tool_sources: list[str] | None = None
     messages: list[Message] = Field(default_factory=list)
     calls: dict[str, ToolCall] = Field(default_factory=dict)
     memories: list[Memory] = Field(default_factory=list)

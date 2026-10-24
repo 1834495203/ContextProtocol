@@ -12,6 +12,7 @@ class GuideLinks(Model):
     health: str
     api_docs: str
     context_tools: str
+    tool_sources: str
 
 
 class GuideStep(Model):
@@ -31,7 +32,7 @@ class GuideResource(Model):
 
 
 class AgentGuide(Model):
-    guide_version: str = "0.1"
+    guide_version: str = "0.2"
     title: str = "Context Protocol Agent 接入说明"
     service_base_url: str
     api_base_url: str
@@ -41,6 +42,8 @@ class AgentGuide(Model):
     rules: list[str]
     placeholders: dict[str, str]
     workflow: list[GuideStep]
+    preferred_execution_mode: Literal['gateway'] = 'gateway'
+    gateway_workflow: list[GuideStep]
     schemas: dict[str, JsonObject]
     resources: list[GuideResource]
     quickstart_argv: list[list[str]]

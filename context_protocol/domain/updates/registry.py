@@ -6,7 +6,7 @@ from .components import UpsertGroupHandler, ReorderGroupsHandler, DeleteGroupHan
 from .content import UpsertBlockHandler, DeleteBlockHandler, UpsertItemHandler, DeleteItemHandler
 from .state import SetFieldHandler, DeleteFieldHandler, DefineFieldHandler
 from .tools import (OpenHostHandler, CloseHostHandler, RenewHostHandler, SyncProviderHandler,
-                    SetToolPromptHandler, DeleteToolPromptHandler)
+                    SetToolPromptHandler, DeleteToolPromptHandler, SelectToolSourcesHandler)
 from .observations import (RegisterToolHandler, UnregisterToolHandler, AppendMessageHandler, EditMessageHandler,
                            CallToolHandler, ToolResultHandler, AppendMemoryHandler, AppendTraceHandler)
 
@@ -36,6 +36,7 @@ def default_registry() -> UpdateRegistry:
         DeleteBlockHandler, UpsertItemHandler, DeleteItemHandler, SetFieldHandler, DeleteFieldHandler, DefineFieldHandler,
         RegisterToolHandler, UnregisterToolHandler, AppendMessageHandler, EditMessageHandler,
         CallToolHandler, ToolResultHandler, AppendMemoryHandler, AppendTraceHandler,
-        OpenHostHandler, CloseHostHandler, RenewHostHandler, SyncProviderHandler, SetToolPromptHandler, DeleteToolPromptHandler):
+        OpenHostHandler, CloseHostHandler, RenewHostHandler, SyncProviderHandler, SetToolPromptHandler, DeleteToolPromptHandler,
+        SelectToolSourcesHandler):
         registry.register(handler_type())
     return registry

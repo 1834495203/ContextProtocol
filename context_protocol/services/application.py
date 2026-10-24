@@ -11,6 +11,7 @@ from .instances import InstanceService
 from .templates import TemplateService
 from .updates import UpdateService
 from .compilation import CompilationService, InstanceExport, TemplateExport
+from .tool_sources import ToolSourceService
 
 class ContextApplication:
     def __init__(self, repository: ContextRepository, *, compiler: ContextCompiler | None = None):
@@ -21,6 +22,7 @@ class ContextApplication:
         self.template_service = TemplateService(repository, registry)
         self.mutations = UpdateService(repository, registry)
         self.compilation = CompilationService(self.instances, self.template_service, compiler or ContextCompiler())
+        self.tool_sources = ToolSourceService(repository)
 
     @property
     def backend(self) -> str:

@@ -8,6 +8,7 @@ from .models.requests import SessionInput, ConnectInput, BuildInput
 from .models.persistence import TemplateInfo, InstanceInfo, ConnectionResult, InstanceView, UpdateResult, UpdateReceipt
 from .models.compilation import CompiledContext
 from .models.host import PrepareInput, PreparedContext
+from .models.gateway import GatewayCallInput, GatewayCallResult
 
 class WireUpdate(Model):
     protocol_version: str = "0.1"
@@ -79,6 +80,17 @@ class ContextClient:
         response = self.client.post(self.path+"/prepare", json=(request or PrepareInput()).model_dump(mode="json"))
         response.raise_for_status()
         return PreparedContext.model_validate(response.json())
+
+    def call_tool(self, request: GatewayCallInput) -> GatewayCallResult:
+        body = request.model_dump(mode='json')
+        for attempt in range(2):
+            try:
+                response = self.client.post(self.path+'/tools/call', json=body)
+                response.raise_for_status()
+                return GatewayCallResult.model_validate(response.json())
+            except httpx.TransportError:
+                if attempt:
+                    raise
 
     # Compatibility for external integrations that exchange the documented JSON wire format.
     def emit(self, kind, payload, turn_id=None, update_id=None):

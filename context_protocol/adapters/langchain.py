@@ -14,6 +14,7 @@ from ..client import ContextClient
 from ..models.context import Model, JsonObject, RegisteredTool
 from ..tools import HostTools, LocalTool, validate_tool_arguments
 from ..models.compilation import CompiledContext, ModelMessage
+from ..gateway_agent import GatewayAgent as BaseGatewayAgent, ModelReply
 from ..models.host import PrepareInput
 from ..models.commands import (TraceAppendCommand, AppendTrace, MessageAppendCommand, AppendMessage,
     ToolCallCommand, CallTool, ToolResultCommand, ToolResult,
@@ -248,8 +249,9 @@ class ContextAgent:
             result=self.agent.invoke({"messages":[HumanMessage(content=prompt)]},config={"recursion_limit":20})
             return result["messages"][-1].content
 
+
     async def arun(self, prompt):
-        """Async turn runner required by MCP tools, which expose only coroutines."""
+        """Async turn runner required by host-side coroutine tools."""
         async with self._async_turn_lock:
             self.middleware.turn_id=str(uuid4())
             append=MessageAppendCommand(update_id=str(uuid4()),turn_id=self.middleware.turn_id,
@@ -257,3 +259,17 @@ class ContextAgent:
             await asyncio.to_thread(self.context.submit, append)
             result=await self.agent.ainvoke({"messages":[HumanMessage(content=prompt)]},config={"recursion_limit":20})
             return result["messages"][-1].content
+
+
+class GatewayAgent(BaseGatewayAgent):
+    """LangChain model adapter; tools and their execution remain on the server."""
+    def __init__(self, context: ContextClient, model, *, max_steps=20):
+        def invoke(model_input):
+            renderer = LangChainMessageRenderer()
+            messages = [renderer.converters[message.role](message) for message in model_input.messages]
+            tools = [OpenAITool(function=OpenAIFunction(name=spec.name, description=spec.description,
+                     parameters=spec.input_schema)).model_dump(mode='json') for spec in model_input.tools]
+            response = (model.bind_tools(tools) if tools else model).invoke(messages)
+            return ModelReply(content=text(response.content), tool_calls=[
+                {'id': call['id'], 'name': call['name'], 'arguments': call['args']} for call in response.tool_calls])
+        super().__init__(context, invoke, max_steps=max_steps)

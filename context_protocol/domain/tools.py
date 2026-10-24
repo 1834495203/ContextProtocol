@@ -59,6 +59,8 @@ def resolve_tools(state: ContextState, binding_id: str | None = None) -> tuple[C
     resolved = state.model_copy(deep=True)
     issues: list[PreparationIssue] = []
     revision = None
+    if binding_id is None and state.tool_sources is not None:
+        resolved.tools = {}
     if binding_id is not None:
         resolved.tools = {}
         binding = state.host_bindings.get(binding_id)
@@ -66,7 +68,12 @@ def resolve_tools(state: ContextState, binding_id: str | None = None) -> tuple[C
             issues.append(PreparationIssue(code="binding_unavailable", message="Host binding is missing, closed or expired; reconnect and rediscover tools."))
             return resolved, issues, revision
         revision = binding.revision
+        if binding.managed_by == 'gateway' and state.tool_sources is None:
+            issues.append(PreparationIssue(code='binding_unavailable', message='Central tool sources are no longer selected.'))
+            return resolved, issues, revision
         for provider_id, provider in binding.providers.items():
+            if binding.managed_by == 'gateway' and provider_id not in (state.tool_sources or []):
+                continue
             if provider.status != 'ready':
                 issues.append(PreparationIssue(code="provider_unavailable", message=f"Tool discovery is {provider.status}: {provider_id}"))
                 continue

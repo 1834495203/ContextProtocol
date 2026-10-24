@@ -145,5 +145,5 @@ def test_fresh_database_creates_no_history_tables(tmp_path):
     from sqlalchemy import inspect
     repository = create_repository('sqlite:///' + (tmp_path/'fresh.db').as_posix())
     repository.initialize()
-    assert set(inspect(repository.engine).get_table_names()) == {'sessions','contexts','context_receipts','context_templates','context_bindings','context_handles'}
+    assert set(inspect(repository.engine).get_table_names()) == {'sessions','contexts','context_receipts','context_templates','context_bindings','context_handles','tool_sources'}
     repository.close()

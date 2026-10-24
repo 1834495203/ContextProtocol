@@ -3,6 +3,7 @@
 Requires requirements-tools.txt for local JSON Schema argument validation.
 """
 import inspect
+import asyncio
 from dataclasses import dataclass
 from typing import Callable, Any
 from uuid import uuid4
@@ -23,11 +24,12 @@ def validate_tool_arguments(definition: RegisteredTool, arguments: dict):
 
 
 class HostTools:
-    def __init__(self, context: ContextClient, host_id: str, *, lease_seconds: int = 3600):
+    def __init__(self, context: ContextClient, host_id: str, *, lease_seconds: int = 3600, managed_by='host'):
         self.context = context
         self.binding_id = str(uuid4())
         self._local: dict[str, dict[str, tuple[RegisteredTool, object]]] = {}
-        context.emit('host.open', {'binding_id': self.binding_id, 'host_id': host_id, 'lease_seconds': lease_seconds})
+        context.emit('host.open', {'binding_id': self.binding_id, 'host_id': host_id,
+                                 'lease_seconds': lease_seconds, 'managed_by': managed_by})
 
     def sync(self, provider_id: str, tools: list[RegisteredTool], *, kind='local', status='ready', expected_revision=None):
         self.context.emit('provider.sync', {'binding_id': self.binding_id, 'provider_id': provider_id,
@@ -77,7 +79,8 @@ class HostTools:
             raise ValueError('Tool was not offered to the model')
         current = self.prepare(expected_revision=prepared.binding_revision)
         if not current.ready or not any(t.name == name and t.tool_ref == offered.tool_ref and
-            t.input_schema == offered.input_schema for t in current.compiled.model_input.tools):
+            t.input_schema == offered.input_schema and t.description == offered.description
+            for t in current.compiled.model_input.tools):
             raise ValueError('Tool binding or configuration changed; prepare again before execution')
         return offered
 
@@ -88,7 +91,9 @@ class HostTools:
         if entry is None:
             raise ValueError('No local executor registered for this tool')
         validate_tool_arguments(entry[0], arguments)
-        result = entry[1](**arguments)
+        if inspect.iscoroutinefunction(entry[1]):
+            return await entry[1](**arguments)
+        result = await asyncio.to_thread(entry[1], **arguments)
         return await result if inspect.isawaitable(result) else result
 
     def renew(self):

@@ -2,7 +2,7 @@ from datetime import datetime, timezone, timedelta
 from ...models.context import HostBinding, ProviderCatalog, ToolPrompt
 from ..tools import contract_digest, schema_node
 from ...models.commands import (HostOpenCommand, HostCloseCommand, HostRenewCommand, ProviderSyncCommand,
-                                ToolPromptSetCommand, ToolPromptDeleteCommand)
+                                ToolPromptSetCommand, ToolPromptDeleteCommand, ToolSourcesSetCommand)
 from ...services.errors import Conflict
 from .base import UpdateContext, UpdateHandler
 
@@ -23,7 +23,8 @@ class OpenHostHandler(UpdateHandler[HostOpenCommand]):
         if p.binding_id in context.state.host_bindings:
             raise ValueError("Binding ID already exists; use a new connection ID")
         context.state.host_bindings[p.binding_id] = HostBinding(id=p.binding_id, host_id=p.host_id,
-            expires_at=datetime.now(timezone.utc) + timedelta(seconds=p.lease_seconds), lease_seconds=p.lease_seconds)
+            expires_at=datetime.now(timezone.utc) + timedelta(seconds=p.lease_seconds), lease_seconds=p.lease_seconds,
+            managed_by=p.managed_by)
 
 
 class CloseHostHandler(UpdateHandler[HostCloseCommand]):
@@ -89,3 +90,11 @@ class DeleteToolPromptHandler(UpdateHandler[ToolPromptDeleteCommand]):
     template_safe = True
     def handle(self, context, command):
         context.state.tool_prompts.pop(command.payload.id, None)
+
+
+class SelectToolSourcesHandler(UpdateHandler[ToolSourcesSetCommand]):
+    command_type = ToolSourcesSetCommand
+    template_safe = True
+
+    def handle(self, context, command):
+        context.state.tool_sources = list(command.payload.sources) if command.payload.sources is not None else None

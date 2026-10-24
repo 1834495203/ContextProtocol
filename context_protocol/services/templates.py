@@ -53,6 +53,7 @@ class TemplateService:
         state = new_state()
         state.groups = [group.model_copy(deep=True) for group in source.groups]
         state.tool_prompts = {key: prompt.model_copy(deep=True) for key, prompt in source.tool_prompts.items()}
+        state.tool_sources = list(source.tool_sources) if source.tool_sources is not None else None
         origins = {group.id: group.origin for group in source.groups}
         state.blocks = {key: item.model_copy(deep=True) for key, item in source.blocks.items()
                         if item.origin == "internal" and origins.get(item.group_id, "internal") == "internal"}

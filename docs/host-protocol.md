@@ -1,5 +1,7 @@
 # 宿主接入规范：text-tools / 0.1
 
+集中式模式见 [工具网关](tool-gateway.md)：实例配置 tool.sources.set 后，prepare 无需 binding_id，工具通过服务端 tools/call 执行。下文描述的 host.open / provider.sync 为宿主直连兼容流程。
+
 本文件定义框架无关的 HTTP 接入契约。Python 服务是参考实现；客户端不需要导入本项目、Pydantic、LangChain 或继承 Agent 类。本文中的“必须”是实现此宿主配置的符合性要求。
 
 开发 AI 可以从 `GET /api/agent-guide` 获取自包含接入说明；`?format=markdown` 返回可直接阅读或保存的 Markdown，包含本规范、工具接入说明、请求/响应 Schema 与示例源码。接口只读、不查询存储，返回的服务链接按实际请求地址和部署前缀生成。

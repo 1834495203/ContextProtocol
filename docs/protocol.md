@@ -1,10 +1,12 @@
 # 当前上下文协议
 
+HTTP API 0.8 提供集中式工具来源管理 `/api/tool-sources` 与统一执行 `/api/sessions/{id}/tools/call`。模板/实例通过 tool.sources.set 选择来源；prepare 自动发现并返回 preparation_id，Agent 不再需要自行注册 host 或连接 MCP。`compile` 仍为只读预览，集中式 `prepare` 会维护连接、目录和绑定元数据，见 [工具网关](tool-gateway.md)。
+
 工具接入首选 [MCP 与宿主绑定](tool-integration.md)。新增 host.open/renew/close、provider.sync、tool.prompt.set/delete 命令，分别管理宿主连接、提供方目录和描述配置；它们使用同一更新事务与幂等协议，不改变已有命令格式。
 
 框架无关的执行接入契约见 [宿主协议](host-protocol.md)。新增 `POST /api/sessions/{id}/prepare` 用于版本、能力与输入可用性检查；`GET /api/protocol` 提供宿主版本和准备请求/响应 JSON Schema。现有编译、更新与预览格式保持兼容。
 
-HTTP API 版本 0.6；更新载荷版本 0.1，ContextEnvelope 版本 0.2。类型定义位于 `models/`，纯更新与编译逻辑位于 `domain/`；`protocol.py` 是旧 JSON 函数的兼容入口。更新 Schema 使用按 type 判别的 Pydantic 联合，每种 payload 均有具体模型。
+HTTP API 版本 0.8；更新载荷版本 0.1，ContextEnvelope 版本 0.2。类型定义位于 `models/`，纯更新与编译逻辑位于 `domain/`；`protocol.py` 是旧 JSON 函数的兼容入口。更新 Schema 使用按 type 判别的 Pydantic 联合，每种 payload 均有具体模型。
 
 ## 接口
 

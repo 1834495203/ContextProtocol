@@ -11,8 +11,9 @@ let databaseLabel='存储';
 let templateState=null, templateRevision=null;
 let templates=[], objectType='instance', view='templates', activeTemplateId=null;
 let toolBindingId=null;
+let toolSources=[];
 async function api(path,options={}){
- const res=await fetch('/api'+path,{headers:{'Content-Type':'application/json'},...options});const body=await res.json();
+ const res=await fetch('/api'+path,{headers:{'Content-Type':'application/json'},...options});const body=res.status===204?null:await res.json();
  if(!res.ok)throw new Error(typeof body.detail==='string'?body.detail:pretty(body.detail||body));return body;
 }
 const post=(path,body)=>api(path,{method:'POST',body:JSON.stringify(body)});
@@ -24,9 +25,10 @@ async function append(type,payload,turnId=null){return post(base()+'/updates',{p
 function group(id){return sessionData.state.groups.find(g=>g.id===id);}
 async function init(){try{
  const h=await api('/health');databaseLabel={postgresql:'PostgreSQL',sqlite:'SQLite',mysql:'MySQL'}[h.database]||h.database;$('#db-status').textContent=databaseLabel+' 已连接';$('#db-status').title=h.storage?.database||'';
- await Promise.all([loadSessions(),loadTemplates()]);
+ await Promise.all([loadSessions(),loadTemplates(),loadToolSources()]);
  const params=new URLSearchParams(location.search);
- if(params.get('template'))await selectTemplate(params.get('template'));
+ if(params.get('view')==='tool-sources')await setView('tool-sources');
+ else if(params.get('template'))await selectTemplate(params.get('template'));
  else if(params.get('instance')||params.get('session'))await selectSession(params.get('instance')||params.get('session'));
  else await setView('templates');
 }catch(e){$('#db-dot').classList.add('error');$('#db-status').textContent='存储未就绪';$('#offline').textContent=e.message;$('#offline').classList.remove('hidden');}}
@@ -34,6 +36,25 @@ function empty(){$('#empty').classList.remove('hidden');$('#session-content').cl
 async function loadSessions(){sessions=await api('/sessions');renderUnassigned();renderScope();renderTemplates();}
 function renderUnassigned(){const old=sessions.filter(s=>!s.template_id);$('#unassigned-panel').classList.toggle('hidden',!old.length);$('#unassigned-title').textContent='待归属旧实例 · '+old.length;$('#unassigned-list').innerHTML=old.map(s=>`<div class="legacy-row"><span>${esc(s.name)}</span><button class="text-button" data-session="${s.id}">查看内容</button><button class="button" data-assign-instance="${s.id}">设置归属</button></div>`).join('');}
 async function loadTemplates(){templates=await api('/templates');renderTemplates();renderScope();}
+async function loadToolSources(){toolSources=await api('/tool-sources');renderToolSources();}
+function renderToolSources(){
+ $('#tool-source-list').innerHTML=toolSources.map(s=>`<article class="template-card"><span class="tag">${esc(s.connection.transport)} · ${s.enabled?'启用':'停用'}</span><h3>${esc(s.title)}</h3><code>${esc(s.id)}</code><p>${s.discovered_at?'已发现 '+s.tools.length+' 个工具；实例运行前会重新确认':'尚未发现工具'}${s.last_error?' · 最近发现失败：'+esc(s.last_error):''}</p><div class="template-card-actions"><button class="button" data-discover-source="${esc(s.id)}">发现 / 刷新工具</button><button class="text-button" data-source-catalog="${esc(s.id)}">查看目录</button><button class="text-button" data-edit-source="${esc(s.id)}">编辑来源</button><button class="text-button danger" data-delete-source="${esc(s.id)}">移除</button></div></article>`).join('')||'<div class="template-explanation">先添加 MCP 服务、上下文能力或服务器本地方法来源，再在模板或实例中选择。</div>';
+}
+function sourceDialog(id=null){
+ const s=toolSources.find(item=>item.id===id);
+ const initial=s?.connection||{transport:'context',tools:['state.set','memory.append']};
+ dialog(s?'编辑工具来源':'添加工具来源',field('来源 ID','id',s?.id||'context')+field('显示名称','title',s?.title||'上下文能力')+select('启用状态','enabled',{true:'启用',false:'停用'},String(s?.enabled??true))+field('连接配置（JSON）','connection',pretty(initial),'textarea','MCP 本地：{"transport":"stdio","command":"python","args":["server.py"]}；远程：{"transport":"streamable_http","url":"http://localhost:3000/mcp"}。本地方法使用服务器启动时注册的 local 来源。')+'<p class="dialog-note">stdio 命令会在本服务所在环境执行。凭据使用 env_refs / header_env_refs 引用服务器环境变量。</p>',async d=>{
+  if(id&&d.id!==id)throw new Error('已有来源 ID 不能修改。');
+  await post('/tool-sources',{id:d.id,title:d.title,enabled:d.enabled==='true',connection:JSON.parse(d.connection),expected_revision:s?.revision??null});await loadToolSources();
+ });
+}
+function sourceSelectionDialog(){
+ captureScopeRevision();const selected=sessionData.state.tool_sources;
+ dialog('选择工具来源',scopeField()+select('工具接入方式','mode',{gateway:'由上下文服务统一发现并执行',host:'由 Agent 宿主自行提供（兼容方式）'},'gateway')+toolSources.map(s=>`<label class="source-choice"><input type="checkbox" name="source_${esc(s.id)}" ${(selected||[]).includes(s.id)?'checked':''}><span>${esc(s.title)} <small>${esc(s.id)} · ${esc(s.connection.transport)}${s.enabled?'':' · 已停用'}</small></span></label>`).join('')+'<p class="dialog-note">模板级选择会同步到已有实例。来源定义和提示词可提前配置，实例准备时才确认实际可用性。</p>',async d=>{
+  const sources=d.mode==='host'?null:toolSources.filter(s=>d['source_'+s.id]).map(s=>s.id);
+  await scopedAppend(d.scope,'tool.sources.set',{sources});toolBindingId=null;
+ });
+}
 function renderTemplates(){
  $('#template-nav').innerHTML=templates.map(t=>`<button class="session-item ${t.id===activeTemplateId?'active':''}" data-edit-template="${t.id}" title="${esc(t.name)}">${esc(t.name)}</button>`).join('');
  $('#template-list').innerHTML=templates.map(t=>`<article class="template-card"><span class="tag">${sessions.filter(s=>s.template_id===t.id).length} 个实例</span><h3>${esc(t.name)}</h3><p>${esc(t.description||'自定义上下文组成、默认内容与策略。')}</p><small>修订 ${t.revision}</small><div class="template-card-actions"><button class="button" data-edit-template="${t.id}">打开模板与实例</button><button class="text-button" data-duplicate-template="${t.id}">复制</button><button class="button primary" data-use-template="${t.id}">新建实例 ↗</button></div></article>`).join('')||'<p class="muted">还没有模板，点击“新建模板”开始。</p>';
@@ -47,7 +68,7 @@ async function selectSession(id){objectType='instance';sessionId=id;toolBindingI
 async function selectTemplate(id){objectType='template';sessionId=id;activeTemplateId=id;toolBindingId=null;await refresh();history.replaceState(null,'','?template='+id);await setView('workspace');await loadSessions();}
 async function refresh(){const generation=++refreshGeneration,sid=sessionId,kind=objectType;
  const current=await api(base());
- const bindings=Object.values(current.state.host_bindings||{});
+ const bindings=Object.values(current.state.host_bindings||{}).filter(b=>current.state.tool_sources!==null&&current.state.tool_sources!==undefined?b.managed_by==='gateway':b.managed_by!=='gateway');
  if(kind==='instance'&&bindings.length&&!bindings.some(b=>b.id===toolBindingId))toolBindingId=(bindings.find(b=>b.active&&Date.parse(b.expires_at)>Date.now())||bindings[0]).id;
  const compiled=await api(base()+'/preview?budget_chars='+Number($('#budget').value||24000)+(kind==='instance'&&toolBindingId?'&binding_id='+encodeURIComponent(toolBindingId):''));
  if(generation!==refreshGeneration||sid!==sessionId||kind!==objectType)return;
@@ -59,19 +80,24 @@ async function refresh(){const generation=++refreshGeneration,sid=sessionId,kind
 
 function toolDefinitions(){
  const result=new Map(Object.entries(sessionData.state.tool_catalog||{}));const binding=sessionData.state.host_bindings?.[toolBindingId];
+ for(const source of toolSources.filter(s=>(sessionData.state.tool_sources||[]).includes(s.id))){for(const tool of source.tools)result.set(source.id+'/'+tool.name,tool);}
  if(binding){for(const [pid,p] of Object.entries(binding.providers)){for(const t of p.tools)result.set(pid+'/'+t.name,t);}}
  else{for(const t of Object.values(sessionData.state.tools||{}))result.set('legacy/'+t.name,t);}
  return result;
 }
 function renderToolPanel(){
  const bindings=Object.values(sessionData.state.host_bindings||{}),binding=sessionData.state.host_bindings?.[toolBindingId];
+ const isCentral=sessionData.state.tool_sources!==null&&sessionData.state.tool_sources!==undefined;
  const definitions=toolDefinitions(),prompts=sessionData.state.tool_prompts||{};
  const refs=[...new Set([...definitions.keys(),...Object.keys(prompts)])];
  const live=binding?.active&&Date.parse(binding.expires_at)>Date.now();
- const options=bindings.map(b=>`<option value="${esc(b.id)}" ${b.id===toolBindingId?'selected':''}>${esc(b.host_id)} · ${esc(b.id.slice(0,8))} · ${b.active&&Date.parse(b.expires_at)>Date.now()?'连接有效':'已关闭或过期'}</option>`).join('');
+ const options=bindings.map(b=>`<option value="${esc(b.id)}" ${b.id===toolBindingId?'selected':''}>${esc(b.managed_by==='gateway'?'服务端工具连接':b.host_id)} · ${esc(b.id.slice(0,8))} · ${b.active&&Date.parse(b.expires_at)>Date.now()?'连接有效':'已关闭或过期'}</option>`).join('');
  const providerStatus=binding?Object.entries(binding.providers).map(([id,p])=>`${id} (${p.kind}): ${{pending:'待发现',ready:'已确认',error:'发现失败'}[p.status]} · ${p.tools.length} 个工具`).join('；'):'';
- $('#tool-panel').innerHTML=`<div class="section-heading"><div><h2>工具绑定与提示词 <span class="tag">MCP 优先</span></h2><p>连接 MCP 或注册本地方法后即可编辑，无需先运行模型。描述配置可复用，实际工具按宿主连接隔离。</p></div><button class="button" data-new-tool-prompt="1">＋ 工具提示词</button></div>${bindings.length?`<label class="field">预览宿主绑定<select id="tool-binding">${options}</select></label><p>${esc(providerStatus||'尚未同步任何提供方目录')} · 修订 ${binding?.revision??0}</p>`:'<p class="muted">尚无宿主绑定。可先填写工具提示词；MCP 接入与本地注册代码见协议文档。当前显示旧版目录预览。</p>'}<div class="instance-table-wrap"><table class="instance-table"><thead><tr><th>工具身份</th><th>当前绑定</th><th>描述配置</th><th>操作</th></tr></thead><tbody>${refs.map(ref=>{const p=prompts[ref],t=definitions.get(ref),provider=binding?.providers[ref.split('/')[0]];const status=binding?(!live?'绑定已失效':!provider?'缺失':provider.status!=='ready'?'未确认':provider.tools.some(item=>item.name===ref.slice(ref.indexOf('/')+1))?'已发现':'缺失'):(t?'目录已知':'未绑定');return `<tr><td><code>${esc(ref)}</code><small>${esc(t?.description||'可提前配置，等待宿主注册')}</small></td><td>${status}${p?.required?' · 必需':''}</td><td>${p?(p.enabled?'已配置':'已禁用'):'使用来源描述'}</td><td><button class="text-button" data-tool-prompt="${esc(ref)}">编辑描述与参数解释</button>${p?`<button class="text-button" data-delete-tool-prompt="${esc(ref)}">恢复来源描述</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="4" class="muted">暂无工具。推荐通过 MCP 自动发现，或在宿主中注册本地方法。</td></tr>'}</tbody></table></div>`;
+ $('#tool-panel').innerHTML=`<div class="section-heading"><div><h2>工具绑定与提示词 <span class="tag">MCP 优先</span></h2><p>${isCentral?'工具由本服务发现和执行。可先编辑描述，再连接准备，无需先运行模型。':'工具由宿主同步。描述配置可复用，执行能力按宿主连接隔离。'}</p></div><button class="button" data-new-tool-prompt="1">＋ 工具提示词</button></div>${bindings.length?`<label class="field">预览工具连接<select id="tool-binding">${options}</select></label><p>${esc(providerStatus||'尚未同步任何提供方目录')} · 修订 ${binding?.revision??0}</p>`:`<p class="muted">${isCentral?'尚未准备实例工具。可先编辑目录说明，再点击“连接并准备工具”。':'尚无宿主绑定。可先填写工具提示词，当前显示目录预览。'}</p>`}<div class="instance-table-wrap"><table class="instance-table"><thead><tr><th>工具身份</th><th>当前连接</th><th>描述配置</th><th>操作</th></tr></thead><tbody>${refs.map(ref=>{const p=prompts[ref],t=definitions.get(ref),provider=binding?.providers[ref.split('/')[0]];const status=binding?(!live?'绑定已失效':!provider?'缺失':provider.status!=='ready'?'未确认':provider.tools.some(item=>item.name===ref.slice(ref.indexOf('/')+1))?'已发现':'缺失'):(t?'目录已知':'未绑定');return `<tr><td><code>${esc(ref)}</code><small>${esc(t?.description||'可提前配置，等待工具来源注册')}</small></td><td>${status}${p?.required?' · 必需':''}</td><td>${p?(p.enabled?'已配置':'已禁用'):'使用来源描述'}</td><td><button class="text-button" data-tool-prompt="${esc(ref)}">编辑描述与参数解释</button>${p?`<button class="text-button" data-delete-tool-prompt="${esc(ref)}">恢复来源描述</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="4" class="muted">暂无工具。推荐通过 MCP 自动发现，或在服务端注册本地方法。</td></tr>'}</tbody></table></div>`;
  $('#tool-binding')?.addEventListener('change',e=>{toolBindingId=e.target.value;refresh().catch(report);});
+ const central=sessionData.state.tool_sources;
+ const summary=central===null||central===undefined?'由 Agent 宿主提供工具':central.length?central.map(id=>toolSources.find(s=>s.id===id)?.title||id).join('、'):'服务端模式 · 不启用工具';
+ $('#tool-panel').insertAdjacentHTML('afterbegin',`<div class="source-selection"><div><strong>工具来源</strong><p>${esc(summary)}</p></div><div><button class="button" data-select-sources="1">选择来源</button>${objectType==='instance'&&central!==null&&central!==undefined?'<button class="button primary" data-prepare-central="1">连接并准备工具</button>':''}</div></div>`);
 }
 function editToolPrompt(ref=''){
  captureScopeRevision();const t=toolDefinitions().get(ref),p=sessionData.state.tool_prompts?.[ref];
@@ -111,13 +137,14 @@ function renderObject(){const isTemplate=objectType==='template';activeTemplateI
  $('#page-title').textContent=isTemplate?'编辑上下文模板':'运行上下文';
  $('#page-description').textContent=isTemplate?'规划模板的组成、默认提示词、字段与策略，供多个 Agent 复用。':'查看和修改这个实例实际交给 AI 的上下文。';
 }
-async function setView(v){view=v;$('#view-templates').classList.toggle('hidden',v!=='templates');$('#session-content').classList.toggle('hidden',v==='templates'||(!sessionData&&v==='workspace'));$('#empty').classList.add('hidden');
+async function setView(v){view=v;$('#view-templates').classList.toggle('hidden',v!=='templates');$('#view-tool-sources').classList.toggle('hidden',v!=='tool-sources');$('#session-content').classList.toggle('hidden',v==='templates'||v==='tool-sources'||(!sessionData&&v==='workspace'));$('#empty').classList.add('hidden');
  ['workspace','protocol'].forEach(k=>$('#view-'+k).classList.toggle('hidden',k!==v));document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
- $('#breadcrumb').textContent=v==='templates'?'模板库':v==='workspace'?'上下文编排':'协议与接入';
+ $('#breadcrumb').textContent=v==='templates'?'模板库':v==='tool-sources'?'工具接入':v==='workspace'?'上下文编排':'协议与接入';
  $('#build').classList.toggle('hidden',v!=='workspace');$('#export').classList.toggle('hidden',v!=='workspace');
  for(const id of ['#rename-template','#use-template','#save-template','#instance-info','#agent-connect','#assign-instance'])$(id).classList.add('hidden');
  renderScope();
  if(v==='templates'){activeTemplateId=null;renderTemplates();history.replaceState(null,'','/');$('#page-title').textContent='上下文模板库';$('#page-description').textContent='维护多个模板，在接入 Agent 时选择使用。';await loadTemplates();}
+ else if(v==='tool-sources'){history.replaceState(null,'','?view=tool-sources');$('#page-title').textContent='工具接入';$('#page-description').textContent='统一连接和发现工具，让 Agent 只对接上下文服务。';await loadToolSources();}
  else if(v==='workspace'&&sessionData)renderObject();
  else if(v==='workspace'){await setView('templates');}
  else {renderProtocol();$('#page-title').textContent='协议与接入';$('#page-description').textContent='模板定义配置，实例承载运行数据。';}
@@ -125,11 +152,9 @@ async function setView(v){view=v;$('#view-templates').classList.toggle('hidden',
 }
 function renderProtocol(){
  const target=objectType==='instance'&&sessionId?base():'/sessions/CONTEXT_ID';
- const bindingId=toolBindingId||'CONNECTION_ID';
- const endpoint='POST '+location.origin+'/api'+target+'/ingest';
- $('#protocol-example').textContent='GET '+location.origin+'/api/protocol\n\n'+endpoint+'\n'+pretty({protocol_version:'0.1',type:'host.open',update_id:'open-unique-id',source:'your-host',payload:{binding_id:bindingId,host_id:'your-environment'}})+'\n\n'+endpoint+'\n'+pretty({protocol_version:'0.1',type:'provider.sync',update_id:'sync-unique-id',source:'your-host',payload:{binding_id:bindingId,provider_id:'documents',kind:'mcp',status:'ready',tools:[{name:'search',description:'检索文档',input_schema:{type:'object',properties:{query:{type:'string',description:'检索关键词'}},required:['query']}}]}});
- $('#build-example').textContent='POST '+location.origin+'/api'+target+'/prepare\n\n'+pretty({binding_id:bindingId,supported_versions:['0.1'],budget_chars:24000});
- $('#state-example').textContent=pretty({type:'state.set',update_id:'state-1',payload:{key:'phase',value:'实现',value_type:'string'}});
+ $('#protocol-example').textContent='GET '+location.origin+'/api/agent-guide\n\nPOST '+location.origin+'/api/tool-sources\n'+pretty({id:'context',title:'上下文能力',connection:{transport:'context',tools:['state.set','memory.append']}})+'\n\nPOST '+location.origin+'/api'+target+'/updates\n'+pretty({type:'tool.sources.set',update_id:'unique-id',payload:{sources:['context']}});
+ $('#build-example').textContent='POST '+location.origin+'/api'+target+'/prepare\n\n'+pretty({budget_chars:24000});
+ $('#state-example').textContent='POST '+location.origin+'/api'+target+'/tools/call\n\n'+pretty({preparation_id:'FROM_PREPARE',call_id:'FROM_MODEL',name:'FROM_MODEL_INPUT',arguments:{key:'phase',value:'实现',value_type:'string'},assistant_seq:12,turn_id:'same-turn-as-assistant'});
 }
 function field(label,name,value='',kind='input',note=''){return `<label class="field">${label}${kind==='textarea'?`<textarea id="f-${name}" name="${name}">${esc(value)}</textarea>`:`<input id="f-${name}" name="${name}" value="${esc(value)}">`}${note?`<small>${note}</small>`:''}</label>`;}
 function select(label,name,choices,value){return `<label class="field">${label}<select name="${name}">${Object.entries(choices).map(([k,v])=>`<option value="${esc(k)}" ${k===value?'selected':''}>${esc(v)}</option>`).join('')}</select></label>`;}
@@ -199,7 +224,7 @@ function promptDialog(){const options=sessionData.state.groups.filter(g=>g.origi
 
 function messageDialog(messageSeq=null){const m=messageSeq?sessionData.state.messages.find(m=>m.seq===messageSeq):null;dialog(m?'编辑上下文中的用户发言':'添加用户发言',field('用户发言','content',m?.content||'','textarea'),async d=>{if(m)await append('message.update',{message_seq:m.seq,content:d.content});else await append('message.append',{role:'user',content:d.content},crypto.randomUUID());});}
 async function reorder(id,target){const ids=sessionData.state.groups.map(g=>g.id),from=ids.indexOf(id);if(from<0||target<0||target>=ids.length||from===target)return;ids.splice(target,0,ids.splice(from,1)[0]);await append('group.reorder',{ids});await refresh();}
-$('#editor-form').addEventListener('submit',async e=>{e.preventDefault();if(!editorSave||loading)return;loading=true;$('#save-dialog').disabled=true;$('#form-error').textContent='';try{savedScope=objectType;await editorSave(Object.fromEntries(new FormData(e.target)));closeDialog();await refresh();await Promise.all([loadSessions(),loadTemplates()]);notify((savedScope==='template'?'已保存模板并同步全部实例':'已保存当前实例')+' · '+databaseLabel);}catch(error){$('#form-error').textContent=error.message;}finally{loading=false;$('#save-dialog').disabled=false;}});
+$('#editor-form').addEventListener('submit',async e=>{e.preventDefault();if(!editorSave||loading)return;loading=true;$('#save-dialog').disabled=true;$('#form-error').textContent='';try{savedScope=objectType;await editorSave(Object.fromEntries(new FormData(e.target)));closeDialog();if(view!=='tool-sources'&&sessionId)await refresh();await Promise.all([loadSessions(),loadTemplates()]);notify((view==='tool-sources'?'工具来源已保存':savedScope==='template'?'已保存模板并同步全部实例':'已保存当前实例')+' · '+databaseLabel);}catch(error){$('#form-error').textContent=error.message;}finally{loading=false;$('#save-dialog').disabled=false;}});
 bind('#close-dialog',closeDialog);bind('#cancel-dialog',closeDialog);
 function newTemplateDialog(sourceTemplateId=null,sourceContextId=null){
  const original=templates.find(t=>t.id===sourceTemplateId);
@@ -218,6 +243,7 @@ async function connectionDialog(sid){const current=sid===sessionId&&objectType==
  dialog('Agent 接入 · '+b.slug,'<p class="dialog-note">使用模板 ID 与实例简名定位。下面的 create=False 只连接已有实例，避免误建。http 的 base_url 设置为 '+esc(location.origin)+'/api。</p><pre class="connect-code">'+esc(code)+'</pre><pre class="connect-code">'+esc(request)+'</pre>',null,true);
 }
 bind('#new-template',()=>newTemplateDialog());bind('#new-template-side',()=>newTemplateDialog());
+bind('#new-tool-source',()=>sourceDialog());
 bind('#instance-info',instanceInfoDialog);bind('#agent-connect',()=>connectionDialog(sessionId));bind('#assign-instance',()=>assignInstanceDialog(sessionId));
 bind('#demo',()=>setView('templates'));bind('#use-template',()=>useTemplateDialog(sessionId));
 bind('#save-template',()=>newTemplateDialog(null,sessionId));
@@ -228,6 +254,12 @@ bind('#export',async()=>{const data=await api(base()+'/export'+(objectType==='in
 bind('#copy-prompt',async()=>{await navigator.clipboard.writeText(pretty(artifact.model_input));notify('已复制模型输入');});
 $('#budget').addEventListener('change',()=>refresh().catch(report));
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;Promise.resolve().then(async()=>{const d=b.dataset;
+ if(d.editSource){sourceDialog(d.editSource);return;}
+ if(d.discoverSource){notify('正在发现工具…');await post('/tool-sources/'+encodeURIComponent(d.discoverSource)+'/discover',{});await loadToolSources();notify('工具目录已更新');return;}
+ if(d.sourceCatalog){const s=toolSources.find(item=>item.id===d.sourceCatalog);dialog('工具目录 · '+s.title,'<p class="dialog-note">这是缓存定义；实例准备时确认实际连接。</p><pre>'+esc(pretty(s.tools))+'</pre>',null,true);return;}
+ if(d.deleteSource){const id=d.deleteSource;dialog('移除工具来源','<p>移除后，引用该来源的实例会报告工具不可用，已有调用历史保留。</p>',async()=>{await api('/tool-sources/'+encodeURIComponent(id),{method:'DELETE'});await loadToolSources();});return;}
+ if(d.selectSources){await loadToolSources();sourceSelectionDialog();return;}
+ if(d.prepareCentral){const result=await post(base()+'/prepare',{budget_chars:Number($('#budget').value||24000)});toolBindingId=result.binding_id;await loadToolSources();await refresh();notify(result.ready?'工具已准备，可由 Agent 调用':result.issues.map(i=>i.message).join('；'));return;}
  if(d.connectInstance)await connectionDialog(d.connectInstance);else if(d.assignInstance)assignInstanceDialog(d.assignInstance);else if(d.editTemplate)await selectTemplate(d.editTemplate);else if(d.useTemplate)useTemplateDialog(d.useTemplate);else if(d.duplicateTemplate)newTemplateDialog(d.duplicateTemplate);else if(d.session)await selectSession(d.session);else if(d.view)await setView(d.view);else if(d.settings)componentDialog(d.settings);else if(d.content)contentDialog(d.content);
  else if(d.move){const i=sessionData.state.groups.findIndex(g=>g.id===d.move);await reorder(d.move,i+Number(d.delta));}
  else if(d.toggle){await append('group.upsert',{...group(d.toggle),enabled:!group(d.toggle).enabled});await refresh();}

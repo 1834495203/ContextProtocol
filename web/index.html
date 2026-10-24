@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light"><title>Context Protocol · 上下文工作台</title>
-  <link rel="stylesheet" href="/static/style.css?v=0.7.2"><script defer src="/static/app.js?v=0.7.2"></script>
+  <link rel="stylesheet" href="/static/style.css?v=0.8.1"><script defer src="/static/app.js?v=0.8.1"></script>
 </head>
 <body>
   <aside class="sidebar">
-    <a class="brand" href="/"><span class="brand-icon">⌘</span><span>Context<span class="brand-sub">PROTOCOL / 0.7</span></span></a>
+    <a class="brand" href="/"><span class="brand-icon">⌘</span><span>Context<span class="brand-sub">PROTOCOL / 0.8</span></span></a>
     <div class="workspace-label">WORKSPACE <span>本地工作空间</span></div>
-    <nav><button class="nav-item active" data-view="templates"><span>▤</span>模板库</button><button class="nav-item" data-view="workspace"><span>▦</span>上下文编排</button><button class="nav-item" data-view="protocol"><span>⌁</span>协议与接入</button></nav>
+    <nav><button class="nav-item active" data-view="templates"><span>▤</span>模板库</button><button class="nav-item" data-view="tool-sources"><span>◇</span>工具接入</button><button class="nav-item" data-view="workspace"><span>▦</span>上下文编排</button><button class="nav-item" data-view="protocol"><span>⌁</span>协议与接入</button></nav>
     <div class="session-heading">模板 <button id="new-template-side" title="新建模板" aria-label="新建模板">＋</button></div>
     <div id="template-nav" class="sessions"></div>
     <div class="sidebar-bottom"><span id="db-dot" class="status-dot"></span><span id="db-status">连接存储…</span><small>当前上下文 · 本地持久化</small></div>
@@ -23,6 +23,7 @@
       <div class="template-explanation">模板 → 为 Agent 创建独立运行实例 → 同步工具与对话。不同实例的数据各自保存。</div>
       <div id="template-list" class="template-grid"></div><details id="unassigned-panel" class="legacy-instances hidden"><summary id="unassigned-title">待归属旧实例</summary><p>为旧实例指定模板和简名，只整理归属，保留原有上下文数据。</p><div id="unassigned-list"></div></details>
     </section>
+    <section id="view-tool-sources" class="hidden"><div class="section-heading"><div><h2>服务端工具来源</h2><p>工具统一接入这里，再由模板或实例选择。Agent 通过上下文服务获取工具并提交调用。</p></div><button class="button primary" id="new-tool-source">＋ 添加工具来源</button></div><div id="tool-source-list" class="template-grid"></div></section>
     <section id="empty" class="empty hidden"><h2>选择一个模板开始</h2><p>可创建自己的模板，或使用模板库中的基础模板。</p><button id="demo" class="button primary">打开模板库</button></section>
     <div id="session-content" class="hidden"><section id="template-instances-panel" class="hidden"></section>
       <section class="stats"><div><span id="object-label">当前上下文</span><strong id="stat-session">—</strong><small id="stat-revision">保存后立即生效</small></div><div><span>上下文组件</span><strong id="stat-groups">0</strong><small>顺序、来源、策略均可配置</small></div><div><span>编译字符数</span><strong id="stat-chars">0</strong><small id="stat-budget">预算 24,000 字符</small></div><div><span>模型输入</span><strong id="stat-messages">0</strong><small id="stat-tools">0 个工具定义</small></div></section>
@@ -34,9 +35,9 @@
         <div id="warnings"></div><div id="groups" class="unified-context"></div>
         <details class="preview-panel raw-input"><summary class="preview-heading"><h2>完整模型输入 · JSON</h2><span class="tag">与上方同源</span></summary><p class="conversation-help">通用消息与工具定义。适配器将角色、工具名映射到宿主框架；工具是否可执行由宿主决定。</p><pre id="prompt"></pre></details>
       </section>
-      <section id="view-protocol" class="hidden"><div class="protocol-card"><span class="tag green">CONTEXT PROTOCOL / 0.7</span><h2>管理模型输入，连接任意 Agent。</h2><p>适配器同步对话和工具记录，工作台保存当前上下文。每次模型调用前，读取同一套有序组件和压缩策略编译输入。修改内容仅改变模型将收到的上下文。</p><div class="pipeline"><span>宿主同步内容</span> → <span>当前上下文</span> → <span>分组编译</span> → <span>模型输入</span></div><h3>1. 建立宿主绑定，同步 MCP 或本地工具目录</h3><pre id="protocol-example"></pre><h3>2. 按绑定准备模型输入</h3><pre id="build-example"></pre><p>model_input 是任意宿主共用的消息与工具表示。MCP 推荐通过 HostTools 和 connect_stdio / connect_http 接入，也可直接按上述 HTTP 协议注册。工作台可编辑工具描述和参数解释；只有当前绑定实际提供的工具会进入模型输入。</p><h3>3. 内置状态更新工具</h3><p>context.state.set 可创建和更新自定义字段。宿主将它映射到 state.set 更新；业务工具的执行仍由宿主负责。</p><pre id="state-example"></pre><a href="/docs" target="_blank" rel="noopener">查看 API 文档 ↗</a></div></section>
+      <section id="view-protocol" class="hidden"><div class="protocol-card"><span class="tag green">CONTEXT PROTOCOL / 0.8</span><h2>管理模型输入，连接任意 Agent。</h2><p>先在“工具接入”中连接工具，再在模板或实例选择来源。Agent 只连接上下文服务，获取输入并提交调用，服务负责发现与执行工具。</p><div class="pipeline"><span>工具统一接入</span> → <span>模板 / 实例选择</span> → <span>服务编译与执行</span> → <span>Agent 调用模型</span></div><h3>1. 在服务端添加工具来源，再选择到模板或实例</h3><pre id="protocol-example"></pre><h3>2. 获取模型输入，服务端确认工具可用性</h3><pre id="build-example"></pre><p>model_input 是任意 Agent 共用的消息与工具表示。工具连接、发现和执行由服务端负责；Agent 不需要 MCP 配置或工具执行器。ready=true 时保存 preparation_id，并把消息和工具交给模型。</p><h3>3. 记录助手响应，将工具调用提交给服务执行</h3><p>先用 message.append 保存模型实际返回的助手消息和 tool_call_ids，再把返回的 update.seq 作为 assistant_seq。服务自动记录工具调用与结果，Agent 重新 prepare 后继续推理。</p><pre id="state-example"></pre><a href="/docs" target="_blank" rel="noopener">查看 API 文档 ↗</a> · <a href="/api/agent-guide?format=markdown" target="_blank" rel="noopener">给开发 AI 的完整接入说明 ↗</a></div></section>
     </div>
-    <footer>CONTEXT PROTOCOL <span>编排、查看和修改当前上下文。</span><span class="footer-right">TEMPLATES & CONTEXTS / 0.7</span></footer>
+    <footer>CONTEXT PROTOCOL <span>编排、查看和修改当前上下文。</span><span class="footer-right">TEMPLATES & CONTEXTS / 0.8</span></footer>
   </main>
   <dialog id="editor"><form id="editor-form"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" id="close-dialog" aria-label="关闭">×</button></div><div id="editor-fields"></div><p id="form-error" class="form-error"></p><div class="dialog-actions"><button type="button" class="button" id="cancel-dialog">取消</button><button type="submit" class="button primary" id="save-dialog">保存</button></div></form></dialog>
   <div id="toast" role="status" class="toast hidden"></div>

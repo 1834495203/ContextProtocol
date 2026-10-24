@@ -37,3 +37,6 @@ class PreparedContext(Model):
     compiled: CompiledContext | None = None
     binding_id: str | None = None
     binding_revision: int | None = None
+    preparation_id: str | None = None
+    valid_until: str | None = None
+    execution_mode: Literal['host', 'gateway'] = 'host'

@@ -34,5 +34,9 @@ def make_tables():
         Column("template_id", String(36), ForeignKey("context_templates.id"), nullable=False),
         Column("slug", String(64), nullable=False), Column("origin", String(16), nullable=False),
         UniqueConstraint("template_id", "slug", name="uq_context_template_slug"), **options)
+    tool_sources = Table('tool_sources', metadata,
+        Column('id', String(64), primary_key=True),
+        Column('document', JSON().with_variant(JSONB(), 'postgresql'), nullable=False), **options)
     return metadata, {"sessions": sessions, "contexts": contexts, "context_receipts": receipts,
-                      "context_templates": templates, "context_bindings": bindings, "context_handles": handles}
+                      "context_templates": templates, "context_bindings": bindings, "context_handles": handles,
+                      'tool_sources': tool_sources}

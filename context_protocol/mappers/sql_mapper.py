@@ -6,6 +6,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.sql import Executable
 from ..models.persistence import (SessionRow, InstanceListRow, ContextRow, ReceiptRow, TemplateInfo,
                                   TemplateRow, BindingRow, HandleRow)
+from ..models.gateway import ToolSourceRow
 
 RowType = TypeVar("RowType", bound=BaseModel)
 
@@ -13,6 +14,30 @@ RowType = TypeVar("RowType", bound=BaseModel)
 class SqlMapper:
     def __init__(self, connection: Connection, tables: dict[str, Table], row_locks: bool):
         self.connection, self.tables, self.row_locks = connection, tables, row_locks
+
+    def tool_sources(self) -> list[ToolSourceRow]:
+        table = self.tables['tool_sources']
+        return [ToolSourceRow.model_validate(row.document) for row in self.connection.execute(select(table).order_by(table.c.id))]
+
+    def tool_source(self, source_id: str, lock: bool = False) -> ToolSourceRow | None:
+        table = self.tables['tool_sources']
+        query = select(table.c.document).where(table.c.id == source_id)
+        if lock and self.row_locks:
+            query = query.with_for_update()
+        document = self.connection.execute(query).scalar_one_or_none()
+        return ToolSourceRow.model_validate(document) if document is not None else None
+
+    def save_tool_source(self, row: ToolSourceRow) -> None:
+        table = self.tables['tool_sources']
+        document = row.model_dump(mode='json')
+        if self.tool_source(row.id) is None:
+            self.connection.execute(table.insert().values(id=row.id, document=document))
+        else:
+            self.connection.execute(table.update().where(table.c.id == row.id).values(document=document))
+
+    def delete_tool_source(self, source_id: str) -> None:
+        table = self.tables['tool_sources']
+        self.connection.execute(table.delete().where(table.c.id == source_id))
 
     def _one(self, statement: Executable, model: type[RowType]) -> RowType | None:
         row = self.connection.execute(statement).mappings().first()

@@ -23,6 +23,8 @@ def merge_records(before: dict[str, Record], after: dict[str, Record], target: d
 
 class TemplateSynchronizer:
     def apply(self, before: ContextState, after: ContextState, target: ContextState, revision: int) -> None:
+        if before.tool_sources != after.tool_sources:
+            target.tool_sources = list(after.tool_sources) if after.tool_sources is not None else None
         merge_records(before.blocks, after.blocks, target.blocks)
         merge_records(before.items, after.items, target.items)
         merge_records(before.tool_prompts, after.tool_prompts, target.tool_prompts)

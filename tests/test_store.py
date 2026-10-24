@@ -42,7 +42,7 @@ def test_current_context_is_overwritten_and_compile_is_read_only(client, sid, te
     assert exported["compiled"]["model_input"] == first["model_input"]
     with test_store.repository.transaction() as tx:
         assert tx.context(sid).state.model_dump(mode="json", by_alias=True) == exported["state"]
-        assert set(tx.tables) == {"sessions", "contexts", "context_receipts", "context_templates", "context_bindings", "context_handles"}
+        assert set(tx.tables) == {"sessions", "contexts", "context_receipts", "context_templates", "context_bindings", "context_handles", "tool_sources"}
 
 
 def test_concurrent_sequence_allocation(client, sid, test_store):

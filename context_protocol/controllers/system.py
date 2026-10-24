@@ -47,7 +47,8 @@ def agent_guide(request: Request, format: Literal['json', 'markdown'] = Query(de
         markdown=str(request.url_for('agent_guide'))+'?format=markdown',
         openapi=str(request.url_for('openapi')), protocol=str(request.url_for('protocol')),
         health=str(request.url_for('health')), api_docs=str(request.url_for('swagger_ui_html')),
-        context_tools=str(request.url_for('list_context_tools')))
+        context_tools=str(request.url_for('list_context_tools')),
+        tool_sources=base+'/api/tool-sources')
     guide = build_agent_guide(base, links)
     if format == 'markdown':
         return PlainTextResponse(render_agent_guide(guide), media_type='text/markdown')

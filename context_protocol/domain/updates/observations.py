@@ -56,7 +56,8 @@ class CallToolHandler(UpdateHandler[ToolCallCommand]):
             raise ValueError("call_id 已存在")
         context.state.calls[payload.call_id] = ToolCall(call_id=payload.call_id, name=payload.name,
             arguments=payload.arguments, runtime_name=payload.runtime_name, assistant_seq=payload.assistant_seq,
-            loop_id=payload.loop_id, seq=context.seq, turn_id=context.turn_id, build_id=payload.build_id)
+            loop_id=payload.loop_id, seq=context.seq, turn_id=context.turn_id, build_id=payload.build_id,
+            preparation_id=payload.preparation_id)
 
 
 class ToolResultHandler(UpdateHandler[ToolResultCommand]):

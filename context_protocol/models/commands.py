@@ -57,6 +57,7 @@ class EditMessage(Model):
 
 class CallTool(Model):
     call_id: Identifier
+    preparation_id: str | None = Field(default=None, max_length=200)
     name: Identifier
     arguments: JsonObject
     runtime_name: str | None = None
@@ -98,6 +99,7 @@ class Command(Model):
 class OpenHost(Model):
     binding_id: Identifier
     host_id: Identifier
+    managed_by: Literal['host', 'gateway'] = 'host'
     lease_seconds: int = Field(default=3600, ge=30, le=86400)
 
 
@@ -149,6 +151,21 @@ class DeleteToolPrompt(Model):
 class ToolPromptDeleteCommand(Command):
     type: Literal["tool.prompt.delete"] = "tool.prompt.delete"
     payload: DeleteToolPrompt
+
+
+class SelectToolSources(Model):
+    sources: list[Annotated[str, Field(pattern=r'^[a-z][a-z0-9_-]{0,63}$')]] | None = Field(default=None, max_length=100)
+
+    @model_validator(mode='after')
+    def unique_sources(self):
+        if self.sources is not None and len(self.sources) != len(set(self.sources)):
+            raise ValueError('Tool source IDs must be unique')
+        return self
+
+
+class ToolSourcesSetCommand(Command):
+    type: Literal['tool.sources.set'] = 'tool.sources.set'
+    payload: SelectToolSources
 
 class GroupUpsertCommand(Command):
     type: Literal["group.upsert"] = "group.upsert"
@@ -240,7 +257,7 @@ class TraceAppendCommand(Command):
 
 
 UpdateCommand = Annotated[
-    HostOpenCommand | HostCloseCommand | HostRenewCommand | ProviderSyncCommand
+    ToolSourcesSetCommand | HostOpenCommand | HostCloseCommand | HostRenewCommand | ProviderSyncCommand
     | ToolPromptSetCommand | ToolPromptDeleteCommand
     | GroupUpsertCommand
     | GroupReorderCommand
